@@ -10,20 +10,25 @@ class Settings(BaseSettings):
     )
 
     # ── PostgreSQL ────────────────────────────────────────────
-    POSTGRES_HOST: str = "localhost"
-    POSTGRES_PORT: int = 5432
-    POSTGRES_DB: str = "telecom_kb"
-    POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "changeme"
-    POSTGRES_POOL_MIN: int = 2
-    POSTGRES_POOL_MAX: int = 10
+    POSTGRES_HOST: str
+    POSTGRES_PORT: int
+    POSTGRES_DB: str
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
+    POSTGRES_POOL_MIN: int
+    POSTGRES_POOL_MAX: int
+    POSTGRES_ADMIN_DB: str
+    POSTGRES_AUTO_CREATE: bool
 
     @computed_field
     @property
     def postgres_dsn(self) -> str:
+        host = self.POSTGRES_HOST
+        if host == "localhost":
+            host = "127.0.0.1"
         return (
             f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
-            f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+            f"@{host}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
         )
 
     # ── Neo4j ─────────────────────────────────────────────────
@@ -33,16 +38,39 @@ class Settings(BaseSettings):
     NEO4J_DATABASE: str = "neo4j"
 
     # ── MinIO / S3 ────────────────────────────────────────────
-    MINIO_ENDPOINT: str = "localhost:9000"
+    MINIO_ENDPOINT: str = ""
     MINIO_ACCESS_KEY: str = "minioadmin"
     MINIO_SECRET_KEY: str = "minioadmin"
     MINIO_BUCKET_RAW: str = "telecom-kb-raw"
     MINIO_BUCKET_CLEANED: str = "telecom-kb-cleaned"
     MINIO_SECURE: bool = False
 
+    # ── LLM (relation extraction) ─────────────────────────────
+    LLM_API_KEY: str = ""
+    LLM_BASE_URL: str = "https://api.anthropic.com"
+    LLM_MODEL: str = "claude-haiku-4-5-20251001"
+    LLM_MAX_TOKENS: int = 1024
+    LLM_ENABLED: bool = False   # set True to enable LLM extraction
+
+    # ── Embedding (BAAI/bge-m3, dim=1024) ────────────────────
+    EMBEDDING_MODEL: str = "BAAI/bge-m3"
+    EMBEDDING_DEVICE: str = "cpu"    # or "cuda"
+    EMBEDDING_BATCH_SIZE: int = 32
+    EMBEDDING_DIM: int = 1024
+    EMBEDDING_ENABLED: bool = False  # set True after model is available
+
     # ── Pipeline ──────────────────────────────────────────────
-    ONTOLOGY_VERSION: str = "v0.1.0"
+    ONTOLOGY_VERSION: str = "v0.2.0"
     LOG_LEVEL: str = "INFO"
+    LOG_DIR: str = "logs"
+    LOG_FILE_PREFIX: str = "app"
+    LOG_FILE_MAX_MB: int = 5
+    LOG_FILE_ENABLED: bool = True
+    STARTUP_HEALTH_REQUIRED: bool = True
+
+    WORKER_CRAWL_LIMIT: int = 10
+    WORKER_PIPELINE_LIMIT: int = 10
+    WORKER_SLEEP_SECS: int = 30
 
 
 # Module-level singleton — import this everywhere

@@ -310,3 +310,132 @@ relations:
     range_hint: Fact
     symmetric: false
     transitive: false
+
+  # ── Cross-layer (Five-layer semantic structure) ─────────────
+  - id: participates_in
+    category: cross_layer
+    description: Concept participates in a mechanism
+    domain_hint: ConceptNode
+    range_hint: MechanismNode
+    symmetric: false
+    transitive: false
+
+  - id: explains
+    category: cross_layer
+    description: Mechanism explains the behaviour of a concept
+    domain_hint: MechanismNode
+    range_hint: ConceptNode
+    symmetric: false
+    transitive: false
+
+  - id: implemented_by
+    category: cross_layer
+    description: Mechanism is implemented by a method
+    domain_hint: MechanismNode
+    range_hint: MethodNode
+    symmetric: false
+    transitive: false
+
+  - id: operates_on
+    category: cross_layer
+    description: Method operates on a concept object
+    domain_hint: MethodNode
+    range_hint: ConceptNode
+    symmetric: false
+    transitive: false
+
+  - id: produces
+    category: cross_layer
+    description: Method produces a state or object
+    domain_hint: MethodNode
+    range_hint: ConceptNode
+    symmetric: false
+    transitive: false
+
+  - id: governed_by
+    category: cross_layer
+    description: Method is governed by a condition rule
+    domain_hint: MethodNode
+    range_hint: ConditionRuleNode
+    symmetric: false
+    transitive: false
+
+  - id: applies_to
+    category: cross_layer
+    description: Condition rule constrains a concept or method
+    domain_hint: ConditionRuleNode
+    range_hint: any
+    symmetric: false
+    transitive: false
+
+  - id: contraindicates
+    category: cross_layer
+    description: Condition rule makes a method or scenario inadvisable
+    domain_hint: ConditionRuleNode
+    range_hint: any
+    symmetric: false
+    transitive: false
+
+  - id: selects
+    category: cross_layer
+    description: Condition rule selects a method or scenario
+    domain_hint: ConditionRuleNode
+    range_hint: any
+    symmetric: false
+    transitive: false
+
+  - id: preferred_under
+    category: cross_layer
+    description: Method or scenario is preferred under a condition
+    domain_hint: any
+    range_hint: ConditionRuleNode
+    symmetric: false
+    transitive: false
+
+  - id: risky_under
+    category: cross_layer
+    description: Method or scenario carries risk under a condition
+    domain_hint: any
+    range_hint: ConditionRuleNode
+    symmetric: false
+    transitive: false
+
+  - id: composed_of
+    category: cross_layer
+    description: Scenario is composed of concepts, mechanisms, and methods
+    domain_hint: ScenarioPatternNode
+    range_hint: any
+    symmetric: false
+    transitive: false
+
+  - id: validated_by
+    category: cross_layer
+    description: Scenario or method is validated by a verification method
+    domain_hint: any
+    range_hint: MethodNode
+    symmetric: false
+    transitive: false
+
+  - id: instantiated_as
+    category: cross_layer
+    description: Scenario pattern is instantiated as a concrete case
+    domain_hint: ScenarioPatternNode
+    range_hint: CaseNode
+    symmetric: false
+    transitive: false
+
+  - id: applicable_when
+    category: cross_layer
+    description: Condition scopes where a scenario or method applies
+    domain_hint: any
+    range_hint: ConditionRuleNode
+    symmetric: false
+    transitive: false
+
+  - id: risks
+    category: cross_layer
+    description: Condition layer identifies risks for a scenario
+    domain_hint: ConditionRuleNode
+    range_hint: ScenarioPatternNode
+    symmetric: false
+    transitive: false

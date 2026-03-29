@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from src.db.postgres import fetchall
-from src.db.neo4j_client import run_query
+from semcore.providers.base import GraphStore, RelationalStore
 from src.utils.text import normalize_text
 
 
@@ -11,6 +10,9 @@ def resolve(
     alias: str,
     scope: str | None = None,
     vendor: str | None = None,
+    *,
+    store: RelationalStore,
+    graph: GraphStore,
 ) -> dict:
     alias_lower = normalize_text(alias)
 
@@ -20,7 +22,7 @@ def resolve(
         sql += " AND lower(vendor) = %s"
         params.append(vendor.lower())
     sql += " ORDER BY confidence DESC"
-    rows = fetchall(sql, tuple(params))
+    rows = store.fetchall(sql, tuple(params))
 
     if not rows:
         return {"input": alias, "resolved": None, "alternatives": []}
@@ -29,7 +31,7 @@ def resolve(
     alternatives = rows[1:]
 
     # Enrich with canonical_name from Neo4j
-    node_row = run_query(
+    node_row = graph.read(
         "MATCH (n:OntologyNode {node_id: $id}) RETURN n.canonical_name AS name LIMIT 1",
         id=primary["canonical_node_id"],
     )

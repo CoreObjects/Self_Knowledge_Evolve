@@ -591,12 +591,12 @@ nodes:
     version_introduced: v0.1.0
 
   - id: IP.QOS_SCHEDULER
-    canonical_name: Scheduler
+    canonical_name: QoS Scheduler
     display_name_zh: 调度器
     parent_id: IP.QOS
     maturity_level: core
     description: Controls dequeue order and bandwidth allocation (WFQ, CBWFQ, DRR, PQ)
-    aliases: [Scheduler, Traffic Scheduler, 调度器, WFQ, CBWFQ, DRR, SP]
+    aliases: [QoS Scheduler, Traffic Scheduler, 调度器, WFQ, CBWFQ, DRR]
     allowed_relations: [configured_by, depends_on, contains]
     source_basis: [IETF]
     lifecycle_state: active
@@ -809,3 +809,106 @@ nodes:
     source_basis: [IETF]
     lifecycle_state: active
     version_introduced: v0.1.0
+
+  # ════════════════════════════════════════════
+  # TRANSPORT LAYER
+  # ════════════════════════════════════════════
+  - id: IP.TRANSPORT
+    canonical_name: Transport Layer
+    display_name_zh: 传输层
+    parent_id: null
+    maturity_level: core
+    description: OSI Layer 4 providing end-to-end communication services
+    lifecycle_state: active
+    version_introduced: v0.2.0
+    source_basis: [IETF]
+    allowed_relations: [contains, depends_on]
+
+  - id: IP.TCP
+    canonical_name: TCP
+    display_name_zh: 传输控制协议
+    parent_id: IP.TRANSPORT
+    maturity_level: core
+    description: Transmission Control Protocol. Connection-oriented reliable byte stream. RFC 793.
+    aliases: [Transmission Control Protocol, 传输控制协议, TCP协议, tcp/ip]
+    allowed_relations: [uses_protocol, depends_on, encapsulates, establishes, configured_by]
+    source_basis: [IETF]
+    lifecycle_state: active
+    version_introduced: v0.2.0
+
+  - id: IP.UDP
+    canonical_name: UDP
+    display_name_zh: 用户数据报协议
+    parent_id: IP.TRANSPORT
+    maturity_level: core
+    description: User Datagram Protocol. Connectionless unreliable datagram service. RFC 768.
+    aliases: [User Datagram Protocol, 用户数据报协议, UDP协议]
+    allowed_relations: [uses_protocol, depends_on, encapsulates, configured_by]
+    source_basis: [IETF]
+    lifecycle_state: active
+    version_introduced: v0.2.0
+
+  # ════════════════════════════════════════════
+  # APPLICATION LAYER PROTOCOLS
+  # ════════════════════════════════════════════
+  - id: IP.APP_LAYER
+    canonical_name: Application Layer
+    display_name_zh: 应用层
+    parent_id: null
+    maturity_level: core
+    description: OSI Layer 7 protocols providing services to end users
+    lifecycle_state: active
+    version_introduced: v0.2.0
+    source_basis: [IETF]
+    allowed_relations: [contains, depends_on]
+
+  - id: IP.HTTP
+    canonical_name: HTTP
+    display_name_zh: 超文本传输协议
+    parent_id: IP.APP_LAYER
+    maturity_level: core
+    description: Hypertext Transfer Protocol for web communication. RFC 7231.
+    aliases: [Hypertext Transfer Protocol, HTTP/1.1, HTTP/2, HTTP/3, 超文本传输协议]
+    allowed_relations: [uses_protocol, depends_on, encapsulates, configured_by]
+    source_basis: [IETF]
+    lifecycle_state: active
+    version_introduced: v0.2.0
+
+  - id: IP.TLS
+    canonical_name: TLS
+    display_name_zh: 传输层安全协议
+    parent_id: IP.APP_LAYER
+    maturity_level: core
+    description: Transport Layer Security for encrypted communication. RFC 8446.
+    aliases: [Transport Layer Security, SSL, Secure Sockets Layer, TLS 1.3, TLS 1.2, 传输层安全, HTTPS]
+    allowed_relations: [uses_protocol, depends_on, encapsulates, protects, configured_by]
+    source_basis: [IETF]
+    lifecycle_state: active
+    version_introduced: v0.2.0
+
+  - id: IP.SSH
+    canonical_name: SSH
+    display_name_zh: 安全外壳协议
+    parent_id: IP.APP_LAYER
+    maturity_level: core
+    description: Secure Shell Protocol for encrypted remote access. RFC 4253.
+    aliases: [Secure Shell, SSH协议, sshv2, 安全外壳协议]
+    allowed_relations: [uses_protocol, depends_on, protects, configured_by, authenticates]
+    source_basis: [IETF]
+    lifecycle_state: active
+    version_introduced: v0.2.0
+
+  # ════════════════════════════════════════════
+  # GENERIC IP
+  # ════════════════════════════════════════════
+  - id: IP.IP
+    canonical_name: IP
+    display_name_zh: 互联网协议
+    parent_id: IP.L3_ROUTING
+    maturity_level: core
+    description: Internet Protocol — the network layer protocol for datagram routing.
+    aliases: [Internet Protocol, 互联网协议, IP协议, ip address, IP地址]
+    allowed_relations: [uses_protocol, encapsulates, depends_on, forwards_via]
+    source_basis: [IETF]
+    lifecycle_state: active
+    version_introduced: v0.2.0

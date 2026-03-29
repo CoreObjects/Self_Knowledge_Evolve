@@ -105,7 +105,7 @@ CREATE TABLE IF NOT EXISTS segments (
     dedup_signature     CHAR(64),
     simhash_value       BIGINT,
     embedding_ref       TEXT,
-    embedding           vector(1536),    -- pgvector column; adjust dim to your model
+    embedding           vector(1024),    -- BAAI/bge-m3 produces 1024-dim vectors
     lifecycle_state     VARCHAR(32)  NOT NULL DEFAULT 'active',
     created_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW()
@@ -114,8 +114,54 @@ CREATE TABLE IF NOT EXISTS segments (
 CREATE INDEX IF NOT EXISTS idx_segments_source_doc_id ON segments(source_doc_id);
 CREATE INDEX IF NOT EXISTS idx_segments_type          ON segments(segment_type);
 CREATE INDEX IF NOT EXISTS idx_segments_simhash       ON segments(simhash_value);
--- Vector ANN index (create after bulk-loading data):
+-- Vector ANN index (create after bulk-loading data, requires pgvector >= 0.5):
 -- CREATE INDEX ON segments USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+-- For HNSW (pgvector >= 0.5, better recall):
+-- CREATE INDEX ON segments USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
+
+-- =============================================================
+-- 4a. t_edu_detail  (Elementary Discourse Unit — primary text layer)
+-- edu_id maps 1:1 to segments.segment_id; this table is the
+-- canonical store for downstream retrieval and ontology mapping.
+-- =============================================================
+CREATE TABLE IF NOT EXISTS t_edu_detail (
+    edu_id          VARCHAR(64)   NOT NULL PRIMARY KEY,   -- = segment_id (UUID)
+    title           VARCHAR(255),                          -- generated summary / section heading
+    content_text    TEXT          NOT NULL,                -- original text fragment
+    title_vec       vector(1024),                          -- bge-m3 embedding of title
+    content_vec     vector(1024),                          -- bge-m3 embedding of content_text
+    content_source  VARCHAR(128),                          -- site_key:canonical_url
+    meta_context    JSONB,                                 -- reserved metadata
+    update_time     TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    status          VARCHAR(32)   NOT NULL DEFAULT 'active'
+                    CHECK (status IN ('active', 'outdated', 'archived'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_edu_status  ON t_edu_detail(status);
+CREATE INDEX IF NOT EXISTS idx_edu_source  ON t_edu_detail(content_source);
+-- Vector ANN indexes (create after bulk load):
+-- CREATE INDEX ON t_edu_detail USING hnsw (title_vec   vector_cosine_ops) WITH (m=16, ef_construction=64);
+-- CREATE INDEX ON t_edu_detail USING hnsw (content_vec vector_cosine_ops) WITH (m=16, ef_construction=64);
+
+-- =============================================================
+-- 4b. t_rst_relation  (RST discourse relations between EDUs)
+-- Captures semantic-logical connections between EDU pairs,
+-- serving as the discourse graph before ontology alignment.
+-- =============================================================
+CREATE TABLE IF NOT EXISTS t_rst_relation (
+    nn_relation_id  VARCHAR(36)   NOT NULL PRIMARY KEY,   -- UUID
+    relation_type   VARCHAR(255)  NOT NULL,                -- RST type (Elaboration, Cause-Result, …)
+    src_edu_id      VARCHAR(64)   NOT NULL REFERENCES t_edu_detail(edu_id),
+    dst_edu_id      VARCHAR(64)   NOT NULL REFERENCES t_edu_detail(edu_id),
+    meta_context    JSONB,         -- symmetric relations: {"SYNTACTIC_ORDER": <int>}
+    relation_source VARCHAR(255),  -- rule / llm / manual
+    update_time     TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    reliability     BIGINT        NOT NULL DEFAULT 1       -- confidence placeholder, default 1
+);
+
+CREATE INDEX IF NOT EXISTS idx_rst_src ON t_rst_relation(src_edu_id);
+CREATE INDEX IF NOT EXISTS idx_rst_dst ON t_rst_relation(dst_edu_id);
+CREATE INDEX IF NOT EXISTS idx_rst_type ON t_rst_relation(relation_type);
 
 -- =============================================================
 -- 5. segment_tags
@@ -296,4 +342,8 @@ CREATE TABLE IF NOT EXISTS extraction_jobs (
 -- =============================================================
 INSERT INTO ontology_versions (version_tag, description, status)
 VALUES ('v0.1.0', 'Initial IP/datacommunication subdomain ontology', 'active')
+ON CONFLICT (version_tag) DO NOTHING;
+
+INSERT INTO ontology_versions (version_tag, description, status)
+VALUES ('v0.2.0', 'Five-layer semantic structure: Concept/Mechanism/Method/Condition/Scenario', 'active')
 ON CONFLICT (version_tag) DO NOTHING;

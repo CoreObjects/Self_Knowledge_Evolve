@@ -18,6 +18,7 @@ class OntologyRegistry:
         self.nodes: dict[str, dict] = {}           # node_id → node dict
         self.alias_map: dict[str, str] = {}        # lower(surface_form) → node_id
         self.relation_ids: set[str] = set()        # valid relation type ids
+        self._layer_index: dict[str, list[str]] = {}  # knowledge_layer → [node_id]
 
         self._load_relations(ontology_root / "top" / "relations.yaml")
         for domain_file in sorted((ontology_root / "domains").glob("*.yaml")):
@@ -27,8 +28,9 @@ class OntologyRegistry:
             self._load_aliases(alias_file)
 
         log.info(
-            "OntologyRegistry loaded: %d nodes, %d aliases, %d relations",
+            "OntologyRegistry loaded: %d nodes, %d aliases, %d relations, layers=%s",
             len(self.nodes), len(self.alias_map), len(self.relation_ids),
+            {k: len(v) for k, v in self._layer_index.items()},
         )
 
     # ── Loaders ──────────────────────────────────────────────────
@@ -54,6 +56,9 @@ class OntologyRegistry:
             # Index inline aliases list
             for alias in node.get("aliases", []):
                 self.alias_map[alias.lower()] = nid
+            # Build knowledge_layer index
+            layer = node.get("knowledge_layer", "concept")
+            self._layer_index.setdefault(layer, []).append(nid)
 
     def _load_aliases(self, path: Path) -> None:
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -81,9 +86,35 @@ class OntologyRegistry:
         prefix = domain_prefix.upper() + "."
         return [n for nid, n in self.nodes.items() if nid.startswith(prefix)]
 
+    def get_layer_nodes(self, knowledge_layer: str) -> list[dict]:
+        """Return all nodes belonging to a given knowledge layer.
+
+        Args:
+            knowledge_layer: One of 'concept', 'mechanism', 'method',
+                             'condition', 'scenario'.
+        """
+        return [self.nodes[nid] for nid in self._layer_index.get(knowledge_layer, [])
+                if nid in self.nodes]
+
+    def get_node_layer(self, node_id: str) -> str:
+        """Return the knowledge_layer of a node, defaulting to 'concept'."""
+        node = self.nodes.get(node_id)
+        if node is None:
+            return "concept"
+        return node.get("knowledge_layer", "concept")
+
     # ── Factory ───────────────────────────────────────────────────
+
+    _default_instance: "OntologyRegistry | None" = None
 
     @classmethod
     def from_default(cls) -> "OntologyRegistry":
-        """Load from ./ontology relative to CWD."""
-        return cls(Path("ontology"))
+        """Load from ./ontology relative to CWD (cached singleton)."""
+        if cls._default_instance is None:
+            cls._default_instance = cls(Path("ontology"))
+        return cls._default_instance
+
+    @classmethod
+    def reset_default(cls) -> None:
+        """Clear cached singleton (for testing)."""
+        cls._default_instance = None

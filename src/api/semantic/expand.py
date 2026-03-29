@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.db.neo4j_client import run_query
+from semcore.providers.base import GraphStore
 
 
 def expand(
@@ -12,11 +12,13 @@ def expand(
     min_confidence: float = 0.5,
     include_facts: bool = True,
     include_segments: bool = False,
+    *,
+    graph: GraphStore,
 ) -> dict:
     depth = min(max(depth, 1), 3)
 
     # Validate node exists
-    center_rows = run_query(
+    center_rows = graph.read(
         "MATCH (n:OntologyNode {node_id: $id}) RETURN n LIMIT 1", id=node_id
     )
     if not center_rows:
@@ -30,21 +32,6 @@ def expand(
         rel_types_str = "|".join(relation_types)
         rel_filter = f":{rel_types_str}"
 
-    neighbors_cypher = f"""
-    MATCH (center:OntologyNode {{node_id: $node_id}})
-    MATCH (center)-[r{rel_filter}*1..{depth}]-(neighbor:OntologyNode)
-    WHERE neighbor.node_id <> $node_id
-    WITH DISTINCT neighbor,
-         type(last(relationships(path))) AS rel_type
-    MATCH path = (center)-[r2{rel_filter}*1..{depth}]-(neighbor)
-    RETURN DISTINCT
-        neighbor.node_id        AS node_id,
-        neighbor.canonical_name AS canonical_name,
-        type(last(relationships(path))) AS relation,
-        CASE WHEN startNode(last(relationships(path))).node_id = $node_id
-             THEN 'outbound' ELSE 'inbound' END AS direction,
-        coalesce(last(relationships(path)).confidence, 1.0) AS confidence
-    """
     # Simplified single-hop query that works without APOC
     neighbors_cypher = f"""
     MATCH (center:OntologyNode {{node_id: $node_id}})
@@ -59,7 +46,7 @@ def expand(
         coalesce(r.confidence, 1.0) AS confidence
     LIMIT 50
     """
-    neighbor_rows = run_query(
+    neighbor_rows = graph.read(
         neighbors_cypher, node_id=node_id, min_confidence=min_confidence
     )
     neighbors = [dict(r) for r in neighbor_rows]
@@ -77,7 +64,7 @@ def expand(
                f.confidence AS confidence
         LIMIT 30
         """
-        result["facts"] = [dict(r) for r in run_query(
+        result["facts"] = [dict(r) for r in graph.read(
             facts_cypher, node_id=node_id, min_confidence=min_confidence
         )]
 
@@ -88,6 +75,6 @@ def expand(
                s.section_title AS section_title, s.confidence AS confidence
         LIMIT 20
         """
-        result["segments"] = [dict(r) for r in run_query(seg_cypher, node_id=node_id)]
+        result["segments"] = [dict(r) for r in graph.read(seg_cypher, node_id=node_id)]
 
     return result

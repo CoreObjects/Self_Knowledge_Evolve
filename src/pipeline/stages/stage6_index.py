@@ -1,12 +1,15 @@
-"""Stage 6: Index into Neo4j graph — rules I1-I3."""
+"""Stage 6: Index into Neo4j graph — rules I1-I3 + embedding write."""
 
 from __future__ import annotations
 
 import logging
 
-from src.db.postgres import fetchall, execute
-from src.db.neo4j_client import run_write
+from semcore.core.context import PipelineContext
+from semcore.pipeline.base import Stage
+from semcore.providers.base import GraphStore, RelationalStore
+
 from src.config.settings import settings
+from src.utils.embedding import get_embeddings, vector_to_pg_literal
 
 log = logging.getLogger(__name__)
 
@@ -14,24 +17,51 @@ log = logging.getLogger(__name__)
 MIN_SEGMENT_CONFIDENCE = 0.5
 MIN_FACT_CONFIDENCE    = 0.5
 
+# Five-layer tag types that link segments to non-concept ontology nodes
+_LAYER_TAG_TYPES = {"canonical", "mechanism_tag", "method_tag", "condition_tag", "scenario_tag"}
 
-class IndexStage:
-    def process(self, source_doc_id: str) -> dict:
+# Neo4j label per knowledge layer
+_LAYER_NEO4J_LABEL = {
+    "concept":   "OntologyNode",
+    "mechanism": "MechanismNode",
+    "method":    "MethodNode",
+    "condition": "ConditionRuleNode",
+    "scenario":  "ScenarioPatternNode",
+}
+
+
+class IndexStage(Stage):
+    name = "index"
+
+    def __init__(self) -> None:
+        self._store: RelationalStore | None = None
+        self._graph: GraphStore | None = None
+
+    def process(self, ctx: PipelineContext, app) -> PipelineContext:  # type: ignore[override]
+        self._store = app.store
+        self._graph = app.graph
+        source_doc_id = ctx.doc.source_doc_id if ctx.doc else ctx.source_doc_id
+        stats = self._run(source_doc_id)
+        self.set_output(ctx, stats)
+        return ctx
+
+    def _run(self, source_doc_id: str) -> dict:
         """Index document, segments, facts, evidence into Neo4j."""
+        store = self._store
         stats = {"segments_indexed": 0, "facts_indexed": 0, "evidence_indexed": 0}
 
         # Load from PG
-        doc = fetchall("SELECT * FROM documents WHERE source_doc_id=%s", (source_doc_id,))
+        doc = store.fetchall("SELECT * FROM documents WHERE source_doc_id=%s", (source_doc_id,))
         if not doc:
             log.error("Document %s not found", source_doc_id)
             return stats
         doc = doc[0]
 
-        segments = fetchall(
+        segments = store.fetchall(
             "SELECT * FROM segments WHERE source_doc_id=%s AND lifecycle_state='active' AND confidence>=%s",
             (source_doc_id, MIN_SEGMENT_CONFIDENCE),
         )
-        facts = fetchall(
+        facts = store.fetchall(
             """
             SELECT DISTINCT f.* FROM facts f
             JOIN evidence e ON f.fact_id = e.fact_id
@@ -39,17 +69,17 @@ class IndexStage:
             """,
             (source_doc_id, MIN_FACT_CONFIDENCE),
         )
-        evidence = fetchall(
+        evidence = store.fetchall(
             "SELECT * FROM evidence WHERE source_doc_id=%s",
             (source_doc_id,),
         )
-        seg_tags = fetchall(
+        seg_tags = store.fetchall(
             """
             SELECT st.* FROM segment_tags st
             JOIN segments s ON st.segment_id = s.segment_id
-            WHERE s.source_doc_id=%s AND st.tag_type='canonical'
+            WHERE s.source_doc_id=%s AND st.tag_type = ANY(%s)
             """,
-            (source_doc_id,),
+            (source_doc_id, list(_LAYER_TAG_TYPES)),
         )
 
         # Rule I2: write order — PG already done, now Neo4j
@@ -58,9 +88,11 @@ class IndexStage:
         stats["facts_indexed"]    = self._index_facts(facts)
         stats["evidence_indexed"] = self._index_evidence(evidence, facts)
         self._index_tags(seg_tags)
+        self._write_embeddings(segments)
+        self._write_edu_embeddings(segments)
 
         # Rule I3: mark as indexed in PG
-        execute(
+        store.execute(
             "UPDATE documents SET status='indexed' WHERE source_doc_id=%s", (source_doc_id,)
         )
         log.info("Indexed doc %s → %s", source_doc_id, stats)
@@ -69,7 +101,7 @@ class IndexStage:
     # ── Neo4j writers ─────────────────────────────────────────────
 
     def _index_document(self, doc: dict) -> None:
-        run_write(
+        self._graph.write(
             """
             MERGE (d:SourceDocument {source_doc_id: $source_doc_id})
             SET d.canonical_url  = $canonical_url,
@@ -94,10 +126,16 @@ class IndexStage:
     def _index_segments(self, segments: list[dict]) -> int:
         count = 0
         for seg in segments:
-            run_write(
+            # Build a display name: prefer section_title, fallback to segment_type + index
+            section_title = seg.get("section_title") or ""
+            seg_type = seg.get("segment_type") or "unknown"
+            name = section_title if section_title else f"{seg_type}#{seg.get('segment_index', count)}"
+
+            self._graph.write(
                 """
                 MERGE (s:KnowledgeSegment {segment_id: $segment_id})
-                SET s.source_doc_id  = $source_doc_id,
+                SET s.name           = $name,
+                    s.source_doc_id  = $source_doc_id,
                     s.segment_type   = $segment_type,
                     s.section_title  = $section_title,
                     s.token_count    = $token_count,
@@ -108,10 +146,11 @@ class IndexStage:
                 MATCH (d:SourceDocument {source_doc_id: $source_doc_id})
                 MERGE (s)-[:BELONGS_TO]->(d)
                 """,
+                name=name,
                 segment_id=str(seg["segment_id"]),
                 source_doc_id=str(seg["source_doc_id"]),
-                segment_type=seg.get("segment_type") or "unknown",
-                section_title=seg.get("section_title") or "",
+                segment_type=seg_type,
+                section_title=section_title,
                 token_count=seg.get("token_count") or 0,
                 confidence=float(seg.get("confidence") or 0.5),
                 ontology_version=settings.ONTOLOGY_VERSION,
@@ -122,7 +161,7 @@ class IndexStage:
     def _index_facts(self, facts: list[dict]) -> int:
         count = 0
         for f in facts:
-            run_write(
+            self._graph.write(
                 """
                 MERGE (f:Fact {fact_id: $fact_id})
                 SET f.subject          = $subject,
@@ -156,7 +195,7 @@ class IndexStage:
         for ev in evidence:
             if str(ev["fact_id"]) not in fact_ids:
                 continue
-            run_write(
+            self._graph.write(
                 """
                 MERGE (e:Evidence {evidence_id: $evidence_id})
                 SET e.source_rank       = $source_rank,
@@ -185,16 +224,97 @@ class IndexStage:
         for tag in seg_tags:
             if not tag.get("ontology_node_id"):
                 continue
-            run_write(
-                """
-                MATCH (s:KnowledgeSegment {segment_id: $segment_id})
-                MATCH (n:OntologyNode {node_id: $node_id})
+            # Determine the target Neo4j label from the tag's ontology node prefix
+            node_id = tag["ontology_node_id"]
+            prefix = node_id.split(".")[0] if "." in node_id else ""
+            _prefix_to_layer = {
+                "MECH":  "mechanism",
+                "METHOD": "method",
+                "COND":  "condition",
+                "SCENE": "scenario",
+            }
+            layer = _prefix_to_layer.get(prefix.upper(), "concept")
+            neo4j_label = _LAYER_NEO4J_LABEL.get(layer, "OntologyNode")
+
+            self._graph.write(
+                f"""
+                MATCH (s:KnowledgeSegment {{segment_id: $segment_id}})
+                MERGE (n:{neo4j_label} {{node_id: $node_id}})
                 MERGE (s)-[r:TAGGED_WITH]->(n)
                 SET r.confidence = $confidence,
-                    r.tagger     = $tagger
+                    r.tagger     = $tagger,
+                    r.tag_type   = $tag_type
                 """,
                 segment_id=str(tag["segment_id"]),
-                node_id=tag["ontology_node_id"],
+                node_id=node_id,
                 confidence=float(tag.get("confidence") or 0.8),
                 tagger=tag.get("tagger") or "rule",
+                tag_type=tag.get("tag_type") or "canonical",
             )
+
+    def _write_embeddings(self, segments: list[dict]) -> None:
+        """Generate embeddings for segments and store in PG (best-effort)."""
+        if not segments:
+            return
+        texts = [
+            (seg["segment_id"], seg.get("normalized_text") or seg.get("raw_text", ""))
+            for seg in segments
+        ]
+        texts = [(sid, t) for sid, t in texts if t.strip()]
+        if not texts:
+            return
+
+        segment_ids = [sid for sid, _ in texts]
+        raw_texts   = [t   for _, t in texts]
+
+        vecs = get_embeddings(raw_texts)
+        if vecs is None:
+            return  # embedding disabled or model unavailable
+
+        store = self._store
+        with store.transaction() as cur:
+            for seg_id, vec in zip(segment_ids, vecs):
+                pg_vec = vector_to_pg_literal(vec)
+                cur.execute(
+                    "UPDATE segments SET embedding = %s::vector WHERE segment_id = %s",
+                    (pg_vec, str(seg_id)),
+                )
+        log.info("Wrote embeddings for %d segments", len(segment_ids))
+
+    def _write_edu_embeddings(self, segments: list[dict]) -> None:
+        """Generate title_vec + content_vec for t_edu_detail rows (best-effort)."""
+        if not segments:
+            return
+
+        store = self._store
+        edu_ids   = [str(seg["segment_id"]) for seg in segments]
+        contents  = [seg.get("normalized_text") or seg.get("raw_text", "") for seg in segments]
+
+        # Fetch titles from t_edu_detail (written by stage2)
+        rows = store.fetchall(
+            "SELECT edu_id, title FROM t_edu_detail WHERE edu_id = ANY(%s)",
+            (edu_ids,),
+        )
+        title_map = {r["edu_id"]: r.get("title") or "" for r in rows}
+        titles = [title_map.get(eid, "") for eid in edu_ids]
+
+        content_vecs = get_embeddings(contents)
+        title_vecs   = get_embeddings(titles) if any(titles) else None
+
+        if content_vecs is None:
+            return
+
+        with store.transaction() as cur:
+            for i, edu_id in enumerate(edu_ids):
+                c_vec = vector_to_pg_literal(content_vecs[i])
+                t_vec = vector_to_pg_literal(title_vecs[i]) if title_vecs else None
+                cur.execute(
+                    """
+                    UPDATE t_edu_detail
+                    SET content_vec = %s::vector,
+                        title_vec   = CASE WHEN %s IS NOT NULL THEN %s::vector ELSE title_vec END
+                    WHERE edu_id = %s
+                    """,
+                    (c_vec, t_vec, t_vec, edu_id),
+                )
+        log.info("Wrote EDU embeddings for %d rows", len(edu_ids))

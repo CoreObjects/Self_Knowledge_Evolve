@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import deque
 
-from src.db.neo4j_client import run_query
+from semcore.providers.base import GraphStore
 
 _POLICY_RELATIONS = {
     "causal":  ["CAUSES", "IMPACTS"],
@@ -26,6 +26,8 @@ def impact_propagate(
     max_depth: int = 4,
     min_confidence: float = 0.6,
     context: dict | None = None,
+    *,
+    graph: GraphStore,
 ) -> dict:
     rel_types = _POLICY_RELATIONS.get(relation_policy, _POLICY_RELATIONS["all"])
     impact_type = _IMPACT_TYPE.get(event_type, "affected")
@@ -56,7 +58,7 @@ def impact_propagate(
             RETURN b.node_id AS child_id, b.canonical_name AS child_name,
                    coalesce(r.confidence, 1.0) AS edge_conf
             """
-            rows = run_query(cypher, nid=current_id)
+            rows = graph.read(cypher, nid=current_id)
             for row in rows:
                 child_id  = row["child_id"]
                 edge_conf = float(row["edge_conf"])
@@ -69,7 +71,7 @@ def impact_propagate(
     # Enrich with canonical_name
     impact_tree = []
     for item in visited.values():
-        rows = run_query(
+        rows = graph.read(
             "MATCH (n:OntologyNode {node_id: $id}) RETURN n.canonical_name AS name LIMIT 1",
             id=item["node_id"],
         )

@@ -1,6 +1,7 @@
 """
 Simplified HTTP crawler with robots.txt compliance and rate limiting.
-Not a full Scrapy spider — uses httpx for fetching.
+Not a full Scrapy spider — uses httpx for fetching, with curl_cffi
+fallback for sites protected by TLS fingerprint detection (e.g. Cloudflare).
 """
 
 from __future__ import annotations
@@ -13,16 +14,40 @@ from urllib.parse import urlparse
 
 import httpx
 
-from src.db.postgres import fetchall, execute
-from src.utils.logging import get_logger
+try:
+    from curl_cffi import requests as _cffi
+    _HAS_CURL_CFFI = True
+except ImportError:
+    _HAS_CURL_CFFI = False
 
-log = get_logger(__name__)
+try:
+    import certifi
+    _SSL_VERIFY = certifi.where()
+except ImportError:
+    _SSL_VERIFY = True
+
+from semcore.providers.base import ObjectStore
+from src.db.postgres import fetchall, execute
+from src.providers.minio_store import MinioObjectStore
+
+log = logging.getLogger(__name__)
+
+_BROWSER_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+)
 
 DEFAULT_HEADERS = {
-    "User-Agent": "TelecomKB-Crawler/0.1 (research; contact: admin@example.com)",
+    "User-Agent": _BROWSER_UA,
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9,zh;q=0.8",
 }
+
+# Sites known to use Cloudflare / TLS fingerprint detection → use curl_cffi
+_TLS_FINGERPRINT_SITES = {"www.rfc-editor.org"}
+
+# Sites with broken / self-signed certificate chains → skip SSL verify
+_SSL_SKIP_VERIFY_SITES = {"portal.3gpp.org"}
 
 
 class CrawlTask(TypedDict):
@@ -34,13 +59,15 @@ class CrawlTask(TypedDict):
 
 
 class Spider:
-    def __init__(self) -> None:
+    def __init__(self, object_store: ObjectStore | None = None) -> None:
         self._robots_cache: dict[str, urllib.robotparser.RobotFileParser] = {}
         self._last_request_time: dict[str, float] = {}
+        self._objects = object_store or MinioObjectStore()
         self._client = httpx.Client(
             timeout=30,
             follow_redirects=True,
             headers=DEFAULT_HEADERS,
+            verify=_SSL_VERIFY,
         )
 
     # ── Public ────────────────────────────────────────────────────
@@ -49,16 +76,39 @@ class Spider:
         """Fetch a URL. Returns {html, status_code, final_url, content_type} or None."""
         site_key = self._site_key_from_url(url)
         self._respect_rate_limit(site_key)
+        hostname = urlparse(url).hostname or ""
+
+        # Route: TLS fingerprint protected sites → curl_cffi
+        if hostname in _TLS_FINGERPRINT_SITES:
+            return self._fetch_cffi(url, extra_headers)
+
+        # Route: broken SSL sites → httpx with verify=False
+        if hostname in _SSL_SKIP_VERIFY_SITES:
+            return self._fetch_no_verify(url, extra_headers)
+
         try:
             headers = {**DEFAULT_HEADERS, **(extra_headers or {})}
             resp = self._client.get(url, headers=headers)
             self._last_request_time[site_key] = time.monotonic()
+
+            # If httpx gets 403, try curl_cffi fallback (might be fingerprint block)
+            if resp.status_code == 403 and _HAS_CURL_CFFI:
+                log.info("httpx got 403 for %s, retrying with curl_cffi", url)
+                return self._fetch_cffi(url, extra_headers)
+
             return {
                 "html":         resp.text,
                 "status_code":  resp.status_code,
                 "final_url":    str(resp.url),
                 "content_type": resp.headers.get("content-type", ""),
             }
+        except httpx.ConnectError as exc:
+            # SSL errors on connect — retry with verify=False if not already
+            if "CERTIFICATE_VERIFY_FAILED" in str(exc) and verify is not False:
+                log.info("SSL verify failed for %s, retrying without verification", url)
+                return self._fetch_no_verify(url, extra_headers)
+            log.warning("Fetch failed for %s: %s", url, exc)
+            return None
         except Exception as exc:
             log.warning("Fetch failed for %s: %s", url, exc)
             return None
@@ -94,11 +144,52 @@ class Spider:
     def close(self) -> None:
         self._client.close()
 
+    # ── Fetch helpers ──────────────────────────────────────────────
+
+    def _fetch_cffi(self, url: str, extra_headers: dict | None = None) -> dict | None:
+        """Fetch using curl_cffi with Chrome TLS fingerprint impersonation."""
+        if not _HAS_CURL_CFFI:
+            log.warning("curl_cffi not installed; cannot bypass TLS fingerprint for %s", url)
+            return None
+        site_key = self._site_key_from_url(url)
+        try:
+            headers = {**DEFAULT_HEADERS, **(extra_headers or {})}
+            resp = _cffi.get(url, headers=headers, impersonate="chrome", timeout=30)
+            self._last_request_time[site_key] = time.monotonic()
+            return {
+                "html":         resp.text,
+                "status_code":  resp.status_code,
+                "final_url":    str(resp.url),
+                "content_type": resp.headers.get("content-type", ""),
+            }
+        except Exception as exc:
+            log.warning("curl_cffi fetch failed for %s: %s", url, exc)
+            return None
+
+    def _fetch_no_verify(self, url: str, extra_headers: dict | None = None) -> dict | None:
+        """Fetch with SSL verification disabled (for sites with broken cert chains)."""
+        site_key = self._site_key_from_url(url)
+        try:
+            headers = {**DEFAULT_HEADERS, **(extra_headers or {})}
+            with httpx.Client(timeout=30, follow_redirects=True, verify=False) as client:
+                resp = client.get(url, headers=headers)
+            self._last_request_time[site_key] = time.monotonic()
+            return {
+                "html":         resp.text,
+                "status_code":  resp.status_code,
+                "final_url":    str(resp.url),
+                "content_type": resp.headers.get("content-type", ""),
+            }
+        except Exception as exc:
+            log.warning("Fetch (no-verify) failed for %s: %s", url, exc)
+            return None
+
     # ── Private ───────────────────────────────────────────────────
 
     def _process_task(self, task: dict) -> dict:
         task_id = task["id"]
         url = task["url"]
+        log.info("Crawl task start: id=%s url=%s", task_id, url)
 
         # Mark running
         execute(
@@ -122,14 +213,34 @@ class Spider:
                     "UPDATE crawl_tasks SET status='failed', http_status=%s, finished_at=NOW() WHERE id=%s",
                     (result["status_code"] if result else 0, task_id),
                 )
+                log.warning("Crawl task failed: id=%s status=%s", task_id, result["status_code"] if result else 0)
                 return {"task_id": task_id, "status": "failed"}
+
+            html_bytes = result["html"].encode("utf-8", errors="replace")
+            # Use content hash as key so identical content is never duplicated
+            # and different content (e.g. retries with updated page) is never overwritten
+            import hashlib
+            c_hash = hashlib.sha256(html_bytes).hexdigest()
+            raw_key = f"raw/{c_hash}.html"
+            raw_uri = self._objects.put(
+                raw_key,
+                html_bytes,
+                content_type=result.get("content_type") or "text/html",
+            )
 
             execute(
                 """UPDATE crawl_tasks SET status='done', http_status=%s,
                    finished_at=NOW(), raw_storage_uri=%s WHERE id=%s""",
-                (result["status_code"], f"local://{task_id}", task_id),
+                (result["status_code"], raw_uri, task_id),
             )
-            return {"task_id": task_id, "status": "done", "url": result["final_url"]}
+            log.info(
+                "Crawl task done: id=%s http_status=%s raw_uri=%s bytes=%s",
+                task_id,
+                result["status_code"],
+                raw_uri,
+                len(html_bytes),
+            )
+            return {"task_id": task_id, "status": "done", "url": result["final_url"], "raw_uri": raw_uri}
 
         except Exception as exc:
             execute(

@@ -692,3 +692,140 @@ aliases:
     canonical_node_id: IP.ROUTE_POLICY
     alias_type: full_name
     language: zh
+
+  # ── TCP ──────────────────────────────────────────────────────
+  - surface_form: TCP
+    canonical_node_id: IP.TCP
+    alias_type: abbreviation
+    language: en
+
+  - surface_form: Transmission Control Protocol
+    canonical_node_id: IP.TCP
+    alias_type: full_name
+    language: en
+
+  - surface_form: 传输控制协议
+    canonical_node_id: IP.TCP
+    alias_type: full_name
+    language: zh
+
+  # ── UDP ──────────────────────────────────────────────────────
+  - surface_form: UDP
+    canonical_node_id: IP.UDP
+    alias_type: abbreviation
+    language: en
+
+  - surface_form: User Datagram Protocol
+    canonical_node_id: IP.UDP
+    alias_type: full_name
+    language: en
+
+  - surface_form: 用户数据报协议
+    canonical_node_id: IP.UDP
+    alias_type: full_name
+    language: zh
+
+  # ── IP (generic) ─────────────────────────────────────────────
+  - surface_form: IP
+    canonical_node_id: IP.IP
+    alias_type: abbreviation
+    language: en
+
+  - surface_form: Internet Protocol
+    canonical_node_id: IP.IP
+    alias_type: full_name
+    language: en
+
+  - surface_form: 互联网协议
+    canonical_node_id: IP.IP
+    alias_type: full_name
+    language: zh
+
+  # ── HTTP ─────────────────────────────────────────────────────
+  - surface_form: HTTP
+    canonical_node_id: IP.HTTP
+    alias_type: abbreviation
+    language: en
+
+  - surface_form: Hypertext Transfer Protocol
+    canonical_node_id: IP.HTTP
+    alias_type: full_name
+    language: en
+
+  # ── TLS / SSL ────────────────────────────────────────────────
+  - surface_form: TLS
+    canonical_node_id: IP.TLS
+    alias_type: abbreviation
+    language: en
+
+  - surface_form: SSL
+    canonical_node_id: IP.TLS
+    alias_type: alternate_spelling
+    language: en
+
+  - surface_form: Transport Layer Security
+    canonical_node_id: IP.TLS
+    alias_type: full_name
+    language: en
+
+  - surface_form: HTTPS
+    canonical_node_id: IP.TLS
+    alias_type: alternate_spelling
+    language: en
+
+  # ── SSH ──────────────────────────────────────────────────────
+  - surface_form: SSH
+    canonical_node_id: IP.SSH
+    alias_type: abbreviation
+    language: en
+
+  - surface_form: Secure Shell
+    canonical_node_id: IP.SSH
+    alias_type: full_name
+    language: en
+
+  # ── Existing nodes missing short aliases ─────────────────────
+  - surface_form: L2 Switching
+    canonical_node_id: IP.L2_SWITCHING
+    alias_type: full_name
+    language: en
+
+  - surface_form: 二层交换
+    canonical_node_id: IP.L2_SWITCHING
+    alias_type: full_name
+    language: zh
+
+  - surface_form: L3 Routing
+    canonical_node_id: IP.L3_ROUTING
+    alias_type: full_name
+    language: en
+
+  - surface_form: 三层路由
+    canonical_node_id: IP.L3_ROUTING
+    alias_type: full_name
+    language: zh
+
+  - surface_form: IP routing
+    canonical_node_id: IP.L3_ROUTING
+    alias_type: abbreviation
+    language: en
+
+  - surface_form: L2 switching
+    canonical_node_id: IP.L2_SWITCHING
+    alias_type: abbreviation
+    language: en
+
+  - surface_form: QoS
+    canonical_node_id: IP.QOS
+    alias_type: abbreviation
+    language: en
+
+  - surface_form: Quality of Service
+    canonical_node_id: IP.QOS
+    alias_type: full_name
+    language: en
+
+  - surface_form: 服务质量
+    canonical_node_id: IP.QOS
+    alias_type: full_name
+    language: zh

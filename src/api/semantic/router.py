@@ -1,38 +1,26 @@
-"""FastAPI router wiring all semantic operators to HTTP endpoints."""
+"""FastAPI router — delegates all operator calls to OperatorRegistry via SemanticApp."""
 
 from __future__ import annotations
 
-import time
 from typing import Any
 
-from fastapi import APIRouter, Query, Body
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.config.settings import settings
-from src.api.semantic import (
-    lookup as _lookup,
-    resolve as _resolve,
-    expand as _expand,
-    filter as _filter,
-    path as _path,
-    dependency as _dep,
-    impact as _impact,
-    evidence as _evidence,
-    evolution as _evo,
-)
+from semcore.operators.base import OperatorResult
+from src.app_factory import get_app
 
 router = APIRouter(prefix="/api/v1/semantic", tags=["semantic"])
 
 
-def _wrap(data: Any, t0: float) -> dict:
-    """Attach metadata envelope to every response."""
+def _wrap(result: OperatorResult) -> dict:
     return {
         "meta": {
-            "ontology_version": settings.ONTOLOGY_VERSION,
-            "latency_ms":       round((time.monotonic() - t0) * 1000),
+            "ontology_version": result.ontology_version,
+            "latency_ms":       result.latency_ms,
         },
-        "result": data,
+        "result": result.data,
     }
 
 
@@ -66,6 +54,18 @@ class FactMergeRequest(BaseModel):
 class EvolutionGateRequest(BaseModel):
     candidate_id: str
 
+class SemanticSearchRequest(BaseModel):
+    query:          str
+    top_k:          int   = 5
+    min_similarity: float = 0.5
+    layer_filter:   str | None = None   # concept / mechanism / method / condition / scenario
+
+class EduSearchRequest(BaseModel):
+    query:          str
+    top_k:          int   = 5
+    min_similarity: float = 0.5
+    title_weight:   float = 0.3   # weight for title_vec similarity (content_weight = 1 - title_weight)
+
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
@@ -77,10 +77,16 @@ def lookup(
     ontology_version: str | None = Query(None),
     include_evidence: bool  = Query(False),
     max_evidence:     int   = Query(3),
+    _app = Depends(get_app),
 ):
-    t0 = time.monotonic()
     try:
-        return _wrap(_lookup.lookup(term, scope, lang, ontology_version, include_evidence, max_evidence), t0)
+        return _wrap(_app.query(
+            "lookup",
+            term=term, scope=scope, lang=lang,
+            ontology_version=ontology_version,
+            include_evidence=include_evidence,
+            max_evidence=max_evidence,
+        ))
     except Exception as exc:
         return _err(str(exc))
 
@@ -90,10 +96,10 @@ def resolve(
     alias:  str = Query(...),
     scope:  str | None = Query(None),
     vendor: str | None = Query(None),
+    _app = Depends(get_app),
 ):
-    t0 = time.monotonic()
     try:
-        return _wrap(_resolve.resolve(alias, scope, vendor), t0)
+        return _wrap(_app.query("resolve", alias=alias, scope=scope, vendor=vendor))
     except Exception as exc:
         return _err(str(exc))
 
@@ -106,25 +112,34 @@ def expand(
     min_confidence:   float      = Query(0.5),
     include_facts:    bool       = Query(True),
     include_segments: bool       = Query(False),
+    _app = Depends(get_app),
 ):
-    t0 = time.monotonic()
     try:
-        return _wrap(
-            _expand.expand(node_id, relation_types or None, depth, min_confidence, include_facts, include_segments),
-            t0,
-        )
+        return _wrap(_app.query(
+            "expand",
+            node_id=node_id,
+            relation_types=relation_types or None,
+            depth=depth,
+            min_confidence=min_confidence,
+            include_facts=include_facts,
+            include_segments=include_segments,
+        ))
     except Exception as exc:
         return _err(str(exc))
 
 
 @router.post("/filter")
-def filter_objects(body: FilterRequest):
-    t0 = time.monotonic()
+def filter_objects(body: FilterRequest, _app = Depends(get_app)):
     try:
-        return _wrap(
-            _filter.filter_objects(body.object_type, body.filters, body.sort_by, body.sort_order, body.page, body.page_size),
-            t0,
-        )
+        return _wrap(_app.query(
+            "filter",
+            object_type=body.object_type,
+            filters=body.filters,
+            sort_by=body.sort_by,
+            sort_order=body.sort_order,
+            page=body.page,
+            page_size=body.page_size,
+        ))
     except Exception as exc:
         return _err(str(exc))
 
@@ -136,10 +151,17 @@ def path_infer(
     relation_policy: str   = Query("all"),
     max_hops:        int   = Query(5, ge=1, le=8),
     min_confidence:  float = Query(0.5),
+    _app = Depends(get_app),
 ):
-    t0 = time.monotonic()
     try:
-        return _wrap(_path.path_infer(start_node_id, end_node_id, relation_policy, max_hops, min_confidence), t0)
+        return _wrap(_app.query(
+            "path",
+            start_node_id=start_node_id,
+            end_node_id=end_node_id,
+            relation_policy=relation_policy,
+            max_hops=max_hops,
+            min_confidence=min_confidence,
+        ))
     except Exception as exc:
         return _err(str(exc))
 
@@ -150,28 +172,32 @@ def dependency_closure(
     relation_types:   list[str]  = Query(default=[]),
     max_depth:        int        = Query(6, ge=1, le=10),
     include_optional: bool       = Query(False),
+    _app = Depends(get_app),
 ):
-    t0 = time.monotonic()
     try:
-        return _wrap(
-            _dep.dependency_closure(node_id, relation_types or None, max_depth, include_optional),
-            t0,
-        )
+        return _wrap(_app.query(
+            "dependency_closure",
+            node_id=node_id,
+            relation_types=relation_types or None,
+            max_depth=max_depth,
+            include_optional=include_optional,
+        ))
     except Exception as exc:
         return _err(str(exc))
 
 
 @router.post("/impact_propagate")
-def impact_propagate(body: ImpactRequest):
-    t0 = time.monotonic()
+def impact_propagate(body: ImpactRequest, _app = Depends(get_app)):
     try:
-        return _wrap(
-            _impact.impact_propagate(
-                body.event_node_id, body.event_type, body.relation_policy,
-                body.max_depth, body.min_confidence, body.context,
-            ),
-            t0,
-        )
+        return _wrap(_app.query(
+            "impact_propagate",
+            event_node_id=body.event_node_id,
+            event_type=body.event_type,
+            relation_policy=body.relation_policy,
+            max_depth=body.max_depth,
+            min_confidence=body.min_confidence,
+            context=body.context,
+        ))
     except Exception as exc:
         return _err(str(exc))
 
@@ -181,10 +207,15 @@ def evidence_rank(
     fact_id:     str = Query(...),
     rank_by:     str = Query("evidence_score"),
     max_results: int = Query(10),
+    _app = Depends(get_app),
 ):
-    t0 = time.monotonic()
     try:
-        return _wrap(_evidence.evidence_rank(fact_id, rank_by, max_results), t0)
+        return _wrap(_app.query(
+            "evidence_rank",
+            fact_id=fact_id,
+            rank_by=rank_by,
+            max_results=max_results,
+        ))
     except Exception as exc:
         return _err(str(exc))
 
@@ -194,19 +225,28 @@ def conflict_detect(
     topic_node_id:  str         = Query(...),
     predicate:      str | None  = Query(None),
     min_confidence: float       = Query(0.5),
+    _app = Depends(get_app),
 ):
-    t0 = time.monotonic()
     try:
-        return _wrap(_evidence.conflict_detect(topic_node_id, predicate, min_confidence), t0)
+        return _wrap(_app.query(
+            "conflict_detect",
+            topic_node_id=topic_node_id,
+            predicate=predicate,
+            min_confidence=min_confidence,
+        ))
     except Exception as exc:
         return _err(str(exc))
 
 
 @router.post("/fact_merge")
-def fact_merge(body: FactMergeRequest):
-    t0 = time.monotonic()
+def fact_merge(body: FactMergeRequest, _app = Depends(get_app)):
     try:
-        return _wrap(_evidence.fact_merge(body.fact_ids, body.merge_strategy, body.canonical_fact), t0)
+        return _wrap(_app.query(
+            "fact_merge",
+            fact_ids=body.fact_ids,
+            merge_strategy=body.merge_strategy,
+            canonical_fact=body.canonical_fact,
+        ))
     except Exception as exc:
         return _err(str(exc))
 
@@ -217,10 +257,16 @@ def candidate_discover(
     min_frequency:    int        = Query(5),
     domain:           str | None = Query(None),
     min_source_count: int        = Query(2),
+    _app = Depends(get_app),
 ):
-    t0 = time.monotonic()
     try:
-        return _wrap(_evo.candidate_discover(window_days, min_frequency, domain, min_source_count), t0)
+        return _wrap(_app.query(
+            "candidate_discover",
+            window_days=window_days,
+            min_frequency=min_frequency,
+            domain=domain,
+            min_source_count=min_source_count,
+        ))
     except Exception as exc:
         return _err(str(exc))
 
@@ -229,18 +275,61 @@ def candidate_discover(
 def attach_score(
     candidate_id:         str       = Query(...),
     candidate_parent_ids: list[str] = Query(default=[]),
+    _app = Depends(get_app),
 ):
-    t0 = time.monotonic()
     try:
-        return _wrap(_evo.attach_score(candidate_id, candidate_parent_ids or None), t0)
+        return _wrap(_app.query(
+            "attach_score",
+            candidate_id=candidate_id,
+            candidate_parent_ids=candidate_parent_ids or None,
+        ))
     except Exception as exc:
         return _err(str(exc))
 
 
 @router.post("/evolution_gate")
-def evolution_gate(body: EvolutionGateRequest):
-    t0 = time.monotonic()
+def evolution_gate(body: EvolutionGateRequest, _app = Depends(get_app)):
     try:
-        return _wrap(_evo.evolution_gate(body.candidate_id), t0)
+        return _wrap(_app.query("evolution_gate", candidate_id=body.candidate_id))
+    except Exception as exc:
+        return _err(str(exc))
+
+
+@router.post("/semantic_search")
+def semantic_search(body: SemanticSearchRequest, _app = Depends(get_app)):
+    """
+    Semantic similarity search over knowledge segments using pgvector.
+
+    Requires EMBEDDING_ENABLED=true and embeddings already written by stage6.
+    Falls back to empty result if embedding is not available.
+    """
+    try:
+        return _wrap(_app.query(
+            "semantic_search",
+            query=body.query,
+            top_k=body.top_k,
+            min_similarity=body.min_similarity,
+            layer_filter=body.layer_filter,
+        ))
+    except Exception as exc:
+        return _err(str(exc))
+
+
+@router.post("/edu_search")
+def edu_search(body: EduSearchRequest, _app = Depends(get_app)):
+    """
+    Dual-vector semantic search over t_edu_detail using title_vec + content_vec.
+
+    Combines title and content similarity with configurable weighting.
+    Requires EMBEDDING_ENABLED=true and embeddings written by stage6.
+    """
+    try:
+        return _wrap(_app.query(
+            "edu_search",
+            query=body.query,
+            top_k=body.top_k,
+            min_similarity=body.min_similarity,
+            title_weight=body.title_weight,
+        ))
     except Exception as exc:
         return _err(str(exc))

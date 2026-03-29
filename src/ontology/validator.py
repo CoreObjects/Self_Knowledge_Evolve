@@ -12,6 +12,7 @@ log = logging.getLogger(__name__)
 REQUIRED_NODE_FIELDS = {"id", "canonical_name", "maturity_level", "lifecycle_state"}
 VALID_MATURITY = {"core", "extended", "experimental"}
 VALID_LIFECYCLE = {"active", "deprecated"}
+VALID_KNOWLEDGE_LAYERS = {"concept", "mechanism", "method", "condition", "scenario"}
 
 
 def validate_domain_file(path: Path, relation_ids: set[str] | None = None) -> list[str]:
@@ -43,6 +44,13 @@ def validate_domain_file(path: Path, relation_ids: set[str] | None = None) -> li
         if node.get("lifecycle_state") not in VALID_LIFECYCLE:
             errors.append(
                 f"{path.name}:{nid}: invalid lifecycle_state '{node.get('lifecycle_state')}'"
+            )
+
+        # Knowledge layer (optional field; validate when present)
+        layer = node.get("knowledge_layer")
+        if layer is not None and layer not in VALID_KNOWLEDGE_LAYERS:
+            errors.append(
+                f"{path.name}:{nid}: invalid knowledge_layer '{layer}'"
             )
 
         # Parent must exist in same file (or be null for top-level)

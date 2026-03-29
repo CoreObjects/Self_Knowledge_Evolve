@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import deque
 
-from src.db.neo4j_client import run_query
+from semcore.providers.base import GraphStore
 
 DEFAULT_RELATION_TYPES = ["DEPENDS_ON", "REQUIRES"]
 
@@ -14,6 +14,8 @@ def dependency_closure(
     relation_types: list[str] | None = None,
     max_depth: int = 6,
     include_optional: bool = False,
+    *,
+    graph: GraphStore,
 ) -> dict:
     rel_types = relation_types or DEFAULT_RELATION_TYPES
     max_depth = min(max_depth, 10)
@@ -34,7 +36,7 @@ def dependency_closure(
             MATCH (a:OntologyNode {{node_id: $nid}})-[:{rel}]->(b:OntologyNode)
             RETURN b.node_id AS child_id
             """
-            rows = run_query(cypher, nid=current_id)
+            rows = graph.read(cypher, nid=current_id)
             for row in rows:
                 child_id = row["child_id"]
                 visited[current_id][rel.lower()].append(child_id)

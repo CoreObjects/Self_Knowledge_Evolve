@@ -1,17 +1,16 @@
-"""Pipeline orchestration — runs all 6 stages in sequence for a document."""
+"""Pipeline orchestration — runs all 6 stages in sequence for a document.
+
+NOTE: This is a legacy runner. Prefer using SemanticApp.ingest() which
+properly runs stages through the semcore Pipeline with PipelineContext.
+This runner is kept for batch operations that need direct task-level control.
+"""
 
 from __future__ import annotations
 
 import logging
 import time
 
-from src.db.postgres import fetchall, execute
-from src.pipeline.stages.stage1_ingest import IngestStage
-from src.pipeline.stages.stage2_segment import SegmentStage
-from src.pipeline.stages.stage3_align import AlignStage
-from src.pipeline.stages.stage4_extract import ExtractStage
-from src.pipeline.stages.stage5_dedup import DedupStage
-from src.pipeline.stages.stage6_index import IndexStage
+from src.app_factory import get_app
 from src.utils.logging import get_logger
 
 log = get_logger(__name__)
@@ -19,66 +18,41 @@ log = get_logger(__name__)
 
 class PipelineRunner:
     def __init__(self) -> None:
-        self._ingest  = IngestStage()
-        self._segment = SegmentStage()
-        self._align   = AlignStage()
-        self._extract = ExtractStage()
-        self._dedup   = DedupStage()
-        self._index   = IndexStage()
+        self._app = get_app()
 
     def run_document(self, crawl_task_id: int) -> dict:
-        """Run all 6 stages for one crawl task. Returns summary dict."""
+        """Run the full semcore pipeline for one crawl task."""
+        from semcore.core.context import PipelineContext
         summary: dict = {"crawl_task_id": crawl_task_id, "stages_completed": [], "stats": {}}
         t0 = time.monotonic()
 
-        # Stage 1: Ingest
+        ctx = PipelineContext(source_doc_id="")
+        ctx.meta["crawl_task_id"] = crawl_task_id
+
         try:
-            doc = self._ingest.process(crawl_task_id)
-            if not doc:
-                summary["status"] = "skipped"
-                return summary
-            source_doc_id = doc["source_doc_id"]
-            summary["source_doc_id"] = source_doc_id
-            summary["stages_completed"].append("ingest")
+            ctx = self._app.ingest_context(ctx)
+            summary["source_doc_id"] = ctx.source_doc_id
+            summary["stages_completed"] = self._app.pipeline_stages()
+            if ctx.has_errors():
+                summary["errors"] = ctx.errors
         except Exception as exc:
-            log.error("Stage1 failed for task %d: %s", crawl_task_id, exc, exc_info=True)
-            summary["status"] = "failed"; summary["error"] = str(exc)
+            log.error("Pipeline failed for task %d: %s", crawl_task_id, exc, exc_info=True)
+            summary["status"] = "failed"
+            summary["error"] = str(exc)
             return summary
-
-        # Stages 2-6: operate on source_doc_id
-        stage_fns = [
-            ("segment",  lambda: self._segment.process(source_doc_id)),
-            ("align",    lambda: self._align.process(source_doc_id)),
-            ("extract",  lambda: self._extract.process(source_doc_id)),
-            ("dedup_seg",lambda: self._dedup.process_document(source_doc_id)),
-            ("dedup_fact",lambda: self._dedup.process_facts(source_doc_id)),
-            ("index",    lambda: self._index.process(source_doc_id)),
-        ]
-
-        for stage_name, fn in stage_fns:
-            try:
-                result = fn()
-                summary["stages_completed"].append(stage_name)
-                if isinstance(result, dict):
-                    summary["stats"].update(result)
-                elif isinstance(result, list):
-                    summary["stats"][f"{stage_name}_count"] = len(result)
-            except Exception as exc:
-                log.error("Stage %s failed for doc %s: %s", stage_name, source_doc_id, exc, exc_info=True)
-                summary["stages_completed"].append(f"{stage_name}:FAILED")
-                # Continue to next stage (partial pipeline)
 
         summary["elapsed_s"] = round(time.monotonic() - t0, 2)
         summary["status"] = "done"
         log.info(
             "Pipeline completed for task %d (doc %s) in %.2fs",
-            crawl_task_id, source_doc_id, summary["elapsed_s"],
+            crawl_task_id, summary.get("source_doc_id", "?"), summary["elapsed_s"],
         )
         return summary
 
     def run_batch(self, limit: int = 10) -> list[dict]:
         """Fetch pending tasks and run pipeline for each."""
-        tasks = fetchall(
+        store = self._app.store
+        tasks = store.fetchall(
             """
             SELECT ct.id FROM crawl_tasks ct
             WHERE ct.status = 'done'

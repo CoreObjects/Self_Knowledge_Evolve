@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.db.neo4j_client import run_query
+from semcore.providers.base import GraphStore
 
 _RELATION_POLICIES = {
     "dependency": ["DEPENDS_ON", "REQUIRES"],
@@ -17,6 +17,8 @@ def path_infer(
     relation_policy: str = "all",
     max_hops: int = 5,
     min_confidence: float = 0.5,
+    *,
+    graph: GraphStore,
 ) -> dict:
     max_hops = min(max(max_hops, 1), 8)
     rel_types = _RELATION_POLICIES.get(relation_policy, [])
@@ -36,7 +38,7 @@ def path_infer(
         [rel  IN relationships(path) | coalesce(rel.confidence, 1.0)] AS rel_confs
     LIMIT 5
     """
-    rows = run_query(
+    rows = graph.read(
         cypher, start=start_node_id, end=end_node_id, min_conf=min_confidence
     )
 

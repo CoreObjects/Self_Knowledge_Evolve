@@ -7,11 +7,14 @@ Run:
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 
 from src.config.settings import settings
 from src.db import health_check
+from src.utils.health import startup_health_check
 from src.api.semantic.router import router as semantic_router
 from src.utils.logging import setup_logging
 
@@ -23,10 +26,20 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+log = logging.getLogger(__name__)
+
 
 @app.on_event("startup")
 async def on_startup() -> None:
     setup_logging(settings.LOG_LEVEL)
+    if not startup_health_check():
+        log.error("Startup health check failed.")
+        if settings.STARTUP_HEALTH_REQUIRED:
+            log.error("Shutting down.")
+            raise RuntimeError("Startup health check failed.")
+        log.warning(
+            "Continuing startup with degraded health (STARTUP_HEALTH_REQUIRED=false)."
+        )
 
 
 # ── Routers ───────────────────────────────────────────────────────────────────

@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from src.db.postgres import fetchall, fetchone
-from src.db.neo4j_client import run_query
+from semcore.providers.base import GraphStore, RelationalStore
 
 
 def filter_objects(
@@ -13,21 +12,27 @@ def filter_objects(
     sort_order: str = "desc",
     page: int = 1,
     page_size: int = 20,
+    *,
+    store: RelationalStore,
+    graph: GraphStore,
 ) -> dict:
     page_size = min(page_size, 100)
     offset = (page - 1) * page_size
 
     if object_type == "fact":
-        return _filter_facts(filters, sort_by, sort_order, page_size, offset, page)
+        return _filter_facts(filters, sort_by, sort_order, page_size, offset, page, store)
     elif object_type == "segment":
-        return _filter_segments(filters, sort_by, sort_order, page_size, offset, page)
+        return _filter_segments(filters, sort_by, sort_order, page_size, offset, page, store)
     elif object_type == "concept":
-        return _filter_concepts(filters, page_size, offset, page)
+        return _filter_concepts(filters, page_size, offset, page, graph)
     else:
         return {"error": f"Unknown object_type '{object_type}'"}
 
 
-def _filter_facts(filters: dict, sort_by: str, sort_order: str, limit: int, offset: int, page: int) -> dict:
+def _filter_facts(
+    filters: dict, sort_by: str, sort_order: str, limit: int, offset: int, page: int,
+    store: RelationalStore,
+) -> dict:
     where: list[str] = ["f.lifecycle_state = 'active'"]
     params: list = []
 
@@ -49,17 +54,20 @@ def _filter_facts(filters: dict, sort_by: str, sort_order: str, limit: int, offs
         params.append(filters["after_date"])
 
     where_sql = " AND ".join(where)
-    count_row = fetchone(f"SELECT COUNT(*) as cnt FROM facts f WHERE {where_sql}", tuple(params))
+    count_row = store.fetchone(f"SELECT COUNT(*) as cnt FROM facts f WHERE {where_sql}", tuple(params))
     total = count_row["cnt"] if count_row else 0
 
-    items = fetchall(
+    items = store.fetchall(
         f"SELECT * FROM facts f WHERE {where_sql} ORDER BY f.{safe_sort} {safe_order} LIMIT %s OFFSET %s",
         tuple(params) + (limit, offset),
     )
     return {"items": items, "total": total, "page": page, "page_size": limit}
 
 
-def _filter_segments(filters: dict, sort_by: str, sort_order: str, limit: int, offset: int, page: int) -> dict:
+def _filter_segments(
+    filters: dict, sort_by: str, sort_order: str, limit: int, offset: int, page: int,
+    store: RelationalStore,
+) -> dict:
     where: list[str] = ["s.lifecycle_state = 'active'"]
     params: list = []
 
@@ -83,19 +91,19 @@ def _filter_segments(filters: dict, sort_by: str, sort_order: str, limit: int, o
         params.extend(ranks)
 
     where_sql = " AND ".join(where)
-    count_row = fetchone(
+    count_row = store.fetchone(
         f"SELECT COUNT(*) as cnt FROM segments s JOIN documents d ON s.source_doc_id=d.source_doc_id WHERE {where_sql}",
         tuple(params),
     )
     total = count_row["cnt"] if count_row else 0
-    items = fetchall(
+    items = store.fetchall(
         f"SELECT s.* FROM segments s JOIN documents d ON s.source_doc_id=d.source_doc_id WHERE {where_sql} ORDER BY s.{safe_sort} {safe_order} LIMIT %s OFFSET %s",
         tuple(params) + (limit, offset),
     )
     return {"items": items, "total": total, "page": page, "page_size": limit}
 
 
-def _filter_concepts(filters: dict, limit: int, offset: int, page: int) -> dict:
+def _filter_concepts(filters: dict, limit: int, offset: int, page: int, graph: GraphStore) -> dict:
     cypher = "MATCH (n:OntologyNode) WHERE n.lifecycle_state = 'active'"
     params: dict = {}
     if filters.get("domain"):
@@ -103,5 +111,5 @@ def _filter_concepts(filters: dict, limit: int, offset: int, page: int) -> dict:
         params["domain"] = filters["domain"]
     cypher += " RETURN n ORDER BY n.node_id SKIP $offset LIMIT $limit"
     params.update({"offset": offset, "limit": limit})
-    rows = run_query(cypher, **params)
+    rows = graph.read(cypher, **params)
     return {"items": [dict(r["n"]) for r in rows], "page": page, "page_size": limit}

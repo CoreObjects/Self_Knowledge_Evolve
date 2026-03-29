@@ -4,18 +4,20 @@ from __future__ import annotations
 
 import uuid
 
-from src.db.postgres import fetchall, fetchone, execute, get_conn
+from semcore.providers.base import RelationalStore
 
 
 def evidence_rank(
     fact_id: str,
     rank_by: str = "evidence_score",
     max_results: int = 10,
+    *,
+    store: RelationalStore,
 ) -> dict:
     _allowed = {"evidence_score", "source_rank", "created_at"}
     safe_col = rank_by if rank_by in _allowed else "evidence_score"
 
-    rows = fetchall(
+    rows = store.fetchall(
         f"""
         SELECT e.evidence_id, e.exact_span, e.source_rank, e.extraction_method,
                e.evidence_score, e.created_at,
@@ -35,6 +37,8 @@ def conflict_detect(
     topic_node_id: str,
     predicate: str | None = None,
     min_confidence: float = 0.5,
+    *,
+    store: RelationalStore,
 ) -> dict:
     extra = ""
     params: list = [topic_node_id, topic_node_id, min_confidence]
@@ -42,7 +46,7 @@ def conflict_detect(
         extra = " AND fa.predicate = %s"
         params.append(predicate)
 
-    rows = fetchall(
+    rows = store.fetchall(
         f"""
         SELECT cr.conflict_id, cr.conflict_type, cr.resolution, cr.description,
                fa.fact_id AS fact_id_a, fa.subject, fa.predicate, fa.object AS obj_a,
@@ -65,11 +69,13 @@ def fact_merge(
     fact_ids: list[str],
     merge_strategy: str = "highest_confidence",
     canonical_fact: dict | None = None,
+    *,
+    store: RelationalStore,
 ) -> dict:
     if not fact_ids:
         return {"error": "fact_ids is empty"}
 
-    facts = fetchall(
+    facts = store.fetchall(
         f"SELECT * FROM facts WHERE fact_id IN ({','.join(['%s']*len(fact_ids))})",
         tuple(fact_ids),
     )
@@ -85,22 +91,21 @@ def fact_merge(
     cluster_id = str(uuid.uuid4())
     canonical_id = str(canonical["fact_id"])
 
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            # Mark all as merged, assign cluster
-            for fid in fact_ids:
-                state = "active" if str(fid) == canonical_id else "superseded"
+    with store.transaction() as cur:
+        # Mark all as merged, assign cluster
+        for fid in fact_ids:
+            state = "active" if str(fid) == canonical_id else "superseded"
+            cur.execute(
+                "UPDATE facts SET merge_cluster_id=%s, lifecycle_state=%s WHERE fact_id=%s",
+                (cluster_id, state, fid),
+            )
+        # Re-point all evidence to canonical fact
+        for fid in fact_ids:
+            if str(fid) != canonical_id:
                 cur.execute(
-                    "UPDATE facts SET merge_cluster_id=%s, lifecycle_state=%s WHERE fact_id=%s",
-                    (cluster_id, state, fid),
+                    "UPDATE evidence SET fact_id=%s WHERE fact_id=%s",
+                    (canonical_id, fid),
                 )
-            # Re-point all evidence to canonical fact
-            for fid in fact_ids:
-                if str(fid) != canonical_id:
-                    cur.execute(
-                        "UPDATE evidence SET fact_id=%s WHERE fact_id=%s",
-                        (canonical_id, fid),
-                    )
 
     return {
         "merge_cluster_id": cluster_id,

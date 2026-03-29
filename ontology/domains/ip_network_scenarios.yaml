@@ -1,0 +1,276 @@
+domain: IP / Data Communication Network
+knowledge_layer: scenario
+version: v0.2.0
+nodes:
+
+  # ── Enterprise Interconnection Scenarios ────────────────────
+  - id: SCENE.DualExitCampusInternetScenario
+    canonical_name: DualExitCampusInternetScenario
+    display_name_zh: 企业双出口园区互联网接入场景
+    knowledge_layer: scenario
+    maturity_level: core
+    lifecycle_state: active
+    description: >
+      企业园区通过两条 ISP 链路接入互联网，提供出口冗余和带宽扩展。
+      关键挑战：主备切换、不对称路径、有状态防火墙会话保持。
+    aliases:
+      - dual exit campus
+      - dual ISP campus
+      - dual exit internet access
+      - 双出口园区
+      - 园区双出口
+    allowed_relations:
+      - composed_of
+      - validated_by
+      - instantiated_as
+      - applicable_when
+
+  - id: SCENE.HQBranchInterconnectScenario
+    canonical_name: HQBranchInterconnectScenario
+    display_name_zh: 总部分支互联场景
+    knowledge_layer: scenario
+    maturity_level: core
+    lifecycle_state: active
+    description: >
+      企业总部与多个分支机构通过 MPLS VPN 或 SD-WAN 互联，
+      实现私网互通与互联网访问共存。
+    aliases:
+      - HQ branch interconnect
+      - headquarters branch connectivity
+      - 总分互联
+      - 总部分支互联
+    allowed_relations:
+      - composed_of
+      - validated_by
+      - instantiated_as
+      - applicable_when
+
+  - id: SCENE.BranchServiceSegmentationScenario
+    canonical_name: BranchServiceSegmentationScenario
+    display_name_zh: 分支业务分段隔离场景
+    knowledge_layer: scenario
+    maturity_level: core
+    lifecycle_state: active
+    description: >
+      分支机构内将不同业务（员工办公、访客、IoT、语音）隔离到独立 VLAN/VRF，
+      通过 ACL 和路由策略控制互访。
+    aliases:
+      - branch service segmentation
+      - branch network segmentation
+      - 分支业务隔离
+    allowed_relations:
+      - composed_of
+      - validated_by
+      - instantiated_as
+      - applicable_when
+
+  # ── VPN Scenarios ───────────────────────────────────────────
+  - id: SCENE.MPLSL3VPNProvisioningScenario
+    canonical_name: MPLSL3VPNProvisioningScenario
+    display_name_zh: MPLS L3VPN 业务开通场景
+    knowledge_layer: scenario
+    maturity_level: core
+    lifecycle_state: active
+    description: >
+      运营商或企业在 MPLS 骨干网上为客户开通 L3VPN 专线服务的完整场景，
+      包括 PE/P/CE 角色规划、VRF 配置、RD/RT 设计、PE-CE 路由、
+      端到端验证。
+    aliases:
+      - MPLS L3VPN provisioning
+      - L3VPN service provisioning
+      - VPN service delivery
+      - MPLS VPN开通
+      - L3VPN开通场景
+    allowed_relations:
+      - composed_of
+      - validated_by
+      - instantiated_as
+      - applicable_when
+
+  - id: SCENE.InterVRFCommunicationScenario
+    canonical_name: InterVRFCommunicationScenario
+    display_name_zh: VRF 间互通场景
+    knowledge_layer: scenario
+    maturity_level: core
+    lifecycle_state: active
+    description: >
+      不同 VRF 之间有选择性互通的场景（如内网 VRF 访问共享 DMZ），
+      通过 RT import/export 或 route leaking 实现受控互访。
+    aliases:
+      - inter-VRF communication
+      - VRF leaking
+      - VRF route leaking
+      - VRF间互通
+    allowed_relations:
+      - composed_of
+      - validated_by
+      - instantiated_as
+      - applicable_when
+
+  # ── Data Center Scenarios ───────────────────────────────────
+  - id: SCENE.EVPNVXLANFabricScenario
+    canonical_name: EVPNVXLANFabricScenario
+    display_name_zh: EVPN VXLAN 数据中心网络场景
+    knowledge_layer: scenario
+    maturity_level: core
+    lifecycle_state: active
+    description: >
+      Spine-Leaf 架构数据中心，使用 EVPN+VXLAN 实现 Overlay 二三层互联，
+      支持大规模多租户、东西向流量最优转发、L2/L3 网关分布部署。
+    aliases:
+      - EVPN VXLAN fabric
+      - data center EVPN
+      - spine leaf EVPN
+      - DC fabric
+      - EVPN数据中心
+      - 数据中心EVPN
+    allowed_relations:
+      - composed_of
+      - validated_by
+      - instantiated_as
+      - applicable_when
+
+  - id: SCENE.SpineLeafUnderlayOverlayScenario
+    canonical_name: SpineLeafUnderlayOverlayScenario
+    display_name_zh: Spine-Leaf Underlay/Overlay 部署场景
+    knowledge_layer: scenario
+    maturity_level: core
+    lifecycle_state: active
+    description: >
+      Spine-Leaf 两层 IP Fabric 作为 Underlay（OSPF/IS-IS/eBGP），
+      叠加 VXLAN Overlay，Leaf 节点作为 VTEP 提供租户接入。
+    aliases:
+      - spine leaf underlay overlay
+      - IP fabric overlay
+      - leaf spine VXLAN
+      - Spine-Leaf部署
+    allowed_relations:
+      - composed_of
+      - validated_by
+      - instantiated_as
+      - applicable_when
+
+  - id: SCENE.MultiTenantDCIScenario
+    canonical_name: MultiTenantDCIScenario
+    display_name_zh: 多租户数据中心互联场景
+    knowledge_layer: scenario
+    maturity_level: core
+    lifecycle_state: active
+    description: >
+      两个或多个数据中心之间通过 EVPN/DCI 实现多租户 L2/L3 延伸，
+      支持虚机迁移和跨DC业务连续性。
+    aliases:
+      - multi-tenant DCI
+      - data center interconnect
+      - DCI
+      - 数据中心互联
+    allowed_relations:
+      - composed_of
+      - validated_by
+      - instantiated_as
+      - applicable_when
+
+  # ── Routing Collaboration Scenarios ────────────────────────
+  - id: SCENE.OSPFToBGPBoundaryScenario
+    canonical_name: OSPFToBGPBoundaryScenario
+    display_name_zh: OSPF 与 BGP 边界互联场景
+    knowledge_layer: scenario
+    maturity_level: core
+    lifecycle_state: active
+    description: >
+      企业内网 OSPF 与运营商 BGP 的边界处理：路由重分布策略、
+      默认路由注入、路由过滤，防止私有路由泄漏到公网。
+    aliases:
+      - OSPF BGP boundary
+      - IGP BGP redistribution
+      - OSPF to BGP
+      - OSPF与BGP边界
+    allowed_relations:
+      - composed_of
+      - validated_by
+      - instantiated_as
+      - applicable_when
+
+  - id: SCENE.RRScaleOutScenario
+    canonical_name: RRScaleOutScenario
+    display_name_zh: 路由反射器扩展场景
+    knowledge_layer: scenario
+    maturity_level: core
+    lifecycle_state: active
+    description: >
+      大型 AS 内 iBGP 节点数增长后，从全互联迁移到 RR 层级架构，
+      控制 BGP 会话数量，提升控制平面扩展性。
+    aliases:
+      - route reflector scale out
+      - RR deployment
+      - iBGP scale
+      - 路由反射器扩展
+    allowed_relations:
+      - composed_of
+      - validated_by
+      - instantiated_as
+      - applicable_when
+
+  - id: SCENE.PrimaryBackupRoutingScenario
+    canonical_name: PrimaryBackupRoutingScenario
+    display_name_zh: 主备路由场景
+    knowledge_layer: scenario
+    maturity_level: core
+    lifecycle_state: active
+    description: >
+      通过 BGP LocalPref/MED/路由策略或浮动静态路由实现主备出口，
+      主路径优先，主路径故障后自动切换到备路径。
+    aliases:
+      - primary backup routing
+      - active standby routing
+      - backup route
+      - 主备路由
+      - 主备出口
+    allowed_relations:
+      - composed_of
+      - validated_by
+      - instantiated_as
+      - applicable_when
+
+  # ── Change and Validation Scenarios ────────────────────────
+  - id: SCENE.FailoverDrillScenario
+    canonical_name: FailoverDrillScenario
+    display_name_zh: 故障切换演练场景
+    knowledge_layer: scenario
+    maturity_level: core
+    lifecycle_state: active
+    description: >
+      在维护窗口内人为制造故障（断链路/断设备），验证备用路径切换时间
+      和业务恢复时间是否满足 RTO 目标。
+    aliases:
+      - failover drill
+      - failover test
+      - disaster recovery drill
+      - 故障演练
+      - 切换演练
+    allowed_relations:
+      - composed_of
+      - validated_by
+      - instantiated_as
+      - applicable_when
+
+  - id: SCENE.IncrementalMigrationScenario
+    canonical_name: IncrementalMigrationScenario
+    display_name_zh: 增量迁移场景
+    knowledge_layer: scenario
+    maturity_level: core
+    lifecycle_state: active
+    description: >
+      将现有网络从旧方案（传统 VLAN/静态路由）迁移到新方案（EVPN/BGP），
+      采用分阶段方式，逐步割接，减少业务中断。
+    aliases:
+      - incremental migration
+      - phased migration
+      - network migration
+      - 增量迁移
+      - 网络迁移
+    allowed_relations:
+      - composed_of
+      - validated_by
+      - instantiated_as
+      - applicable_when

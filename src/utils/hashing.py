@@ -39,6 +39,9 @@ def simhash(text: str, hashbits: int = 64) -> int:
     for i in range(hashbits):
         if v[i] > 0:
             result |= (1 << i)
+    # Convert to signed 64-bit to fit PostgreSQL bigint (-2^63 ~ 2^63-1)
+    if result >= (1 << (hashbits - 1)):
+        result -= (1 << hashbits)
     return result
 
 

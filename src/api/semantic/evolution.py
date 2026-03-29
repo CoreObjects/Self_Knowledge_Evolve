@@ -6,8 +6,7 @@ from pathlib import Path
 
 import yaml
 
-from src.db.postgres import fetchall, fetchone, execute
-from src.db.neo4j_client import run_query
+from semcore.providers.base import GraphStore, RelationalStore
 
 _POLICY_PATH = Path("ontology/governance/evolution_policy.yaml")
 
@@ -23,8 +22,10 @@ def candidate_discover(
     min_frequency: int = 5,
     domain: str | None = None,
     min_source_count: int = 2,
+    *,
+    store: RelationalStore,
 ) -> dict:
-    rows = fetchall(
+    rows = store.fetchall(
         """
         SELECT normalized_form, COUNT(*) AS freq, MAX(last_seen_at) AS latest,
                source_count, review_status
@@ -48,8 +49,11 @@ def candidate_discover(
 def attach_score(
     candidate_id: str,
     candidate_parent_ids: list[str] | None = None,
+    *,
+    store: RelationalStore,
+    graph: GraphStore,
 ) -> dict:
-    candidate = fetchone(
+    candidate = store.fetchone(
         "SELECT * FROM evolution_candidates WHERE candidate_id=%s", (candidate_id,)
     )
     if not candidate:
@@ -60,14 +64,14 @@ def attach_score(
 
     # If no parent IDs given, query top-level ontology nodes
     if not candidate_parent_ids:
-        parent_rows = run_query(
+        parent_rows = graph.read(
             "MATCH (n:OntologyNode) WHERE n.lifecycle_state='active' RETURN n.node_id AS nid, n.canonical_name AS name, n.description AS desc LIMIT 50"
         )
         candidate_parent_ids_map = {r["nid"]: r for r in parent_rows}
     else:
         candidate_parent_ids_map = {}
         for pid in candidate_parent_ids:
-            rows = run_query("MATCH (n:OntologyNode {node_id: $id}) RETURN n.node_id AS nid, n.canonical_name AS name, n.description AS desc LIMIT 1", id=pid)
+            rows = graph.read("MATCH (n:OntologyNode {node_id: $id}) RETURN n.node_id AS nid, n.canonical_name AS name, n.description AS desc LIMIT 1", id=pid)
             if rows:
                 candidate_parent_ids_map[pid] = rows[0]
 
@@ -89,8 +93,12 @@ def attach_score(
     }
 
 
-def evolution_gate(candidate_id: str) -> dict:
-    candidate = fetchone(
+def evolution_gate(
+    candidate_id: str,
+    *,
+    store: RelationalStore,
+) -> dict:
+    candidate = store.fetchone(
         "SELECT * FROM evolution_candidates WHERE candidate_id=%s", (candidate_id,)
     )
     if not candidate:
@@ -133,7 +141,7 @@ def evolution_gate(candidate_id: str) -> dict:
 
     gate_passed = len(blocking) == 0
     if gate_passed:
-        execute(
+        store.execute(
             "UPDATE evolution_candidates SET review_status='pending_review' WHERE candidate_id=%s",
             (candidate_id,),
         )

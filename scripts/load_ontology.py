@@ -15,6 +15,7 @@ Usage:
 import argparse
 import logging
 import sys
+import uuid
 from pathlib import Path
 
 import yaml
@@ -121,7 +122,7 @@ def load_aliases(path: Path, session, dry_run: bool) -> int:
     count = 0
 
     for idx, alias in enumerate(aliases):
-        alias_id = f"alias-{alias['canonical_node_id']}-{idx}"
+        alias_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{alias['canonical_node_id']}:{alias['surface_form']}"))
         params = {
             "alias_id":         alias_id,
             "surface_form":     alias["surface_form"],

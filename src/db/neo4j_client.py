@@ -81,6 +81,7 @@ def ping() -> bool:
     """Health-check: returns True if Neo4j is reachable."""
     try:
         _get_driver().verify_connectivity()
+        logger.info("Neo4j ping ok.")
         return True
     except ServiceUnavailable as exc:
         logger.error("Neo4j ping failed: %s", exc)
