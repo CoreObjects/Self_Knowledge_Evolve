@@ -2365,3 +2365,168 @@ extraction_method_score：manual=1.0, rule=0.85, llm=0.70
 ---
 
 *文档版本：v0.1 | 生成日期：2026-03-22*
+
+---
+
+# 附录：实施完成情况（v0.2.0，2026-03-31 更新）
+
+## Phase 1 完成清单
+
+| 任务 | 状态 | 实现说明 |
+|------|------|----------|
+| 搭建 PostgreSQL + Neo4j + MinIO 基础环境 | ✅ 完成 | docker-compose.yml，端口映射到 localhost |
+| 执行 PG 表结构 DDL | ✅ 完成 | scripts/init_postgres.sql，13+ 张表含 pgvector extension |
+| 执行 Neo4j Schema 初始化 | ✅ 完成 | scripts/init_neo4j.py，约束 + 索引 |
+| 导入 relations.yaml | ✅ 完成 | 54 种受控关系类型 |
+| 导入 ip_network.yaml | ✅ 完成 | 153 节点（含 v0.2.0 新增 TCP/UDP/IP/HTTP/TLS/SSH/Transport/Application 8 节点） |
+| 导入 aliases.yaml | ✅ 完成 | 834 条别名（lexicon 156 + 各 domain 内联别名） |
+| source_registry 管理和 crawl_tasks 调度 | ✅ 完成 | worker.py 自动注册 3 个数据源 + 种子 URL |
+| IETF RFC 正文抽取 pipeline（C1~C5） | ✅ 完成 | stage1_ingest.py，含纯文本检测 + preserve_newlines |
+| 语义切分 S1~S4 | ✅ 完成 | stage2_segment.py，支持 Markdown / RFC / 纯文本三种格式 |
+| 本体对齐 A1~A5 | ✅ 完成 | stage3_align.py，词边界匹配 + 候选归一化 upsert |
+
+## Phase 2 完成清单
+
+| 任务 | 状态 | 实现说明 |
+|------|------|----------|
+| 关系抽取 R1~R4 | ✅ 完成 | stage4_extract.py，15 规则模板 + LLM 双通道 |
+| 事实去重 D1~D5 | ✅ 完成 | stage5_dedup.py，SimHash + Jaccard + 冲突检测 |
+| semantic_lookup / semantic_resolve API | ✅ 完成 | 15 个算子全部经 OperatorRegistry 分发 |
+| semantic_expand API | ✅ 完成 | Neo4j 图邻域遍历 |
+| 候选概念发现 candidate_discover | ✅ 完成 | stage3 自动发现 + stage3b 自动评分门控 |
+| 接入 Cisco / Huawei 文档采集 | ⏳ 未开始 | 当前仅 RFC/3GPP/ITU 三个种子源 |
+| 基础质量监控仪表盘 | ⏳ 未开始 | 有 /health API，无可视化 dashboard |
+
+## 超出原计划的额外实现
+
+| 功能 | 说明 |
+|------|------|
+| **semcore 框架包** | 完整的 ABC 抽象层（5 Provider + Stage + Operator + Governance），支持独立发布 |
+| **Stage 3b：本体自动演化** | 候选归一化 → 五维评分 → 六项门控 → 自动/人工晋升，完整闭环 |
+| **多模 LLM 支持** | 兼容 Anthropic / OpenAI / DeepSeek / 通义千问 API |
+| **LLM 熔断器** | 连续 3 次失败自动禁用 10 分钟，防止 pipeline 卡死 |
+| **反爬虫对抗** | curl_cffi TLS 指纹模拟 + SSL 降级 + 自动降级策略 |
+| **内容寻址存储** | MinIO key = SHA-256(content)，重试不覆盖，幂等写入 |
+| **Worker 智能调度** | 失败重试（3 次渐进退避）+ 空转指数退避 |
+| **本地开发模式** | run_dev.py，SQLite + dict 替代真实数据库，零依赖启动 |
+| **RFC 纯文本分段** | 自动检测 .txt 格式，按编号标题 / 全大写标题 / 分页符切分 |
+| **动态段落置信度** | 基于长度 / 语义角色 / 技术术语密度的启发式评分 |
+
+## 文件结构（当前 v0.2.0）
+
+```
+Self_Knowledge_Evolve/
+├── semcore/semcore/                ← 框架包（可独立发布）
+│   ├── core/types.py              13 个领域数据类
+│   ├── core/context.py            PipelineContext
+│   ├── providers/base.py          5 个 Provider ABC
+│   ├── ontology/base.py           OntologyProvider ABC
+│   ├── governance/base.py         3 个治理 ABC
+│   ├── operators/base.py          SemanticOperator + Registry + Middleware
+│   ├── pipeline/base.py           Stage + Pipeline (linear/branch/switch)
+│   └── app.py                     SemanticApp + AppConfig
+│
+├── src/
+│   ├── app.py                     FastAPI 入口
+│   ├── app_factory.py             组合根 build_app()
+│   ├── config/settings.py         Pydantic Settings（.env 驱动）
+│   │
+│   ├── providers/                 5 个 Provider 实现
+│   │   ├── postgres_store.py      RelationalStore → psycopg2
+│   │   ├── neo4j_store.py         GraphStore → neo4j driver
+│   │   ├── anthropic_llm.py       LLMProvider → OpenAI/Anthropic 兼容
+│   │   ├── bge_m3_embedding.py    EmbeddingProvider → SentenceTransformer
+│   │   └── minio_store.py         ObjectStore → MinIO S3
+│   │
+│   ├── ontology/
+│   │   ├── registry.py            OntologyRegistry（单例，YAML → 内存）
+│   │   ├── yaml_provider.py       YAMLOntologyProvider（alias_map/relation_ids/nodes 属性）
+│   │   └── validator.py           YAML 校验
+│   │
+│   ├── governance/
+│   │   ├── confidence_scorer.py   五维置信度评分
+│   │   ├── conflict_detector.py   冲突检测（same S+P, different O）
+│   │   └── evolution_gate.py      六项门控（阈值来自 evolution_policy.yaml）
+│   │
+│   ├── pipeline/
+│   │   ├── pipeline_factory.py    build_pipeline() → 7 阶段
+│   │   ├── runner.py              legacy 批量 runner（使用 app.store）
+│   │   └── stages/
+│   │       ├── stage1_ingest.py   采集入库（C1-C5）
+│   │       ├── stage2_segment.py  语义切分（S1-S4，RFC/Markdown/纯文本）
+│   │       ├── stage3_align.py    本体对齐（A1-A5，词边界匹配）
+│   │       ├── stage3b_evolve.py  本体自动学习（评分/门控/晋升）
+│   │       ├── stage4_extract.py  关系抽取（R1-R4 + LLM，熔断器）
+│   │       ├── stage5_dedup.py    去重融合（D1-D5，SimHash + 冲突检测）
+│   │       └── stage6_index.py    图谱索引（I1-I3 + Embedding，Neo4j name 属性）
+│   │
+│   ├── operators/                 15 个 SemanticOperator（均通过 app.query() 分发）
+│   ├── api/semantic/              9 个算子业务逻辑 + router.py
+│   ├── crawler/                   Spider（curl_cffi + SSL 降级）+ Extractor + Normalizer
+│   ├── utils/                     hashing / confidence / embedding / llm_extract / normalize / text / health
+│   └── dev/                       fake_postgres（SQLite）+ fake_neo4j（dict）+ seed
+│
+├── ontology/
+│   ├── domains/                   5 个 YAML（153 节点）
+│   ├── lexicon/aliases.yaml       156 条别名
+│   ├── top/relations.yaml         54 种关系类型
+│   └── governance/evolution_policy.yaml  演化策略（门控阈值 + 权重 + 反漂移）
+│
+├── scripts/
+│   ├── init_postgres.sql          DDL（13+ 张表 + pgvector）
+│   ├── init_neo4j.py              约束 + 索引
+│   ├── load_ontology.py           YAML → Neo4j + PG
+│   └── migrations/001_evolution_normalize.sql
+│
+├── worker.py                      后台 Worker（爬取 + Pipeline + 重试 + 退避）
+├── run_dev.py                     本地开发入口（SQLite + dict，零外部依赖）
+├── start.bat                      生产启动（FastAPI + Worker）
+└── docker-compose.yml             PostgreSQL + Neo4j + MinIO
+```
+
+## 配置参数一览
+
+### .env 必填项
+
+| 参数 | 说明 | 示例 |
+|------|------|------|
+| POSTGRES_HOST | PG 主机 | 127.0.0.1 |
+| POSTGRES_PORT | PG 端口 | 5432 |
+| POSTGRES_DB | 数据库名 | telecom_kb |
+| POSTGRES_USER | 用户名 | postgres |
+| POSTGRES_PASSWORD | 密码 | (your password) |
+| POSTGRES_POOL_MIN / MAX | 连接池 | 2 / 10 |
+| NEO4J_URI | Neo4j 连接 | bolt://127.0.0.1:7687 |
+| NEO4J_USER / PASSWORD | 认证 | neo4j / (your password) |
+| NEO4J_DATABASE | 数据库 | neo4j |
+| MINIO_ENDPOINT | MinIO 地址 | 127.0.0.1:9001 |
+| MINIO_ACCESS_KEY / SECRET_KEY | 认证 | minio / (your password) |
+
+### .env 可选项
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| LLM_ENABLED | false | 启用 LLM 抽取 |
+| LLM_API_KEY | (空) | API 密钥 |
+| LLM_BASE_URL | https://api.anthropic.com | API 地址 |
+| LLM_MODEL | claude-haiku-4-5-20251001 | 模型名 |
+| EMBEDDING_ENABLED | false | 启用向量嵌入 |
+| EMBEDDING_MODEL | BAAI/bge-m3 | 嵌入模型 |
+| EMBEDDING_DEVICE | cpu | cpu 或 cuda |
+| ONTOLOGY_VERSION | v0.2.0 | 本体版本标记 |
+| STARTUP_HEALTH_REQUIRED | true | 启动时 PG+Neo4j 必须可用 |
+| LOG_LEVEL | INFO | 日志级别 |
+
+## 待优化项
+
+| 优先级 | 项目 | 说明 |
+|--------|------|------|
+| P0 | LLM 批量抽取 | 合并 5-10 个 segment 到一个 prompt，减少 API 调用次数 |
+| P0 | 减小 prompt 体积 | 只发送 segment canonical tags 对应的 node_id，不发全部 100 个 |
+| P1 | 跳过不必要 LLM 调用 | 已有 section_title 的 segment 不调 LLM 生成标题 |
+| P1 | Embedding 集成 | 下载 BAAI/bge-m3，启用 semantic_search / edu_search |
+| P1 | 厂商文档采集 | 接入 Cisco / Huawei 文档源 |
+| P2 | 候选概念积累 | 需要更多数据源和多轮爬取才能触发自动晋升 |
+| P2 | 质量监控仪表盘 | 基于 Grafana 或自建的 pipeline 可观测性 |
+
+*文档版本：v0.2 | 更新日期：2026-03-31*

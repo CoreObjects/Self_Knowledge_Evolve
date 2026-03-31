@@ -1117,4 +1117,248 @@
 - 用语义操作算子为上层应用提供统一能力
 - 用受控演化机制保证系统能够持续吸收新知识而不发散
 
-系统首版应坚持“先做小、做准、做可控”的原则，从单一高价值子域落地，再逐步扩展到全通信领域。
+系统首版应坚持”先做小、做准、做可控”的原则，从单一高价值子域落地，再逐步扩展到全通信领域。
+
+---
+
+# 附录：当前实现状态（v0.2.0，2026-03-31）
+
+以下记录已实际落地的技术实现方案，作为设计文档的补充。
+
+## A1. 架构实现
+
+### A1.1 分层架构落地
+
+```
+semcore 框架层（零外部依赖）
+  ├── core/types.py         13 个领域数据类（OntologyNode, Fact, Segment, ...）
+  ├── core/context.py       PipelineContext（强类型核心字段 + stage_outputs dict）
+  ├── providers/base.py     5 个 Provider ABC（LLM, Embedding, Graph, Relational, Object）
+  ├── ontology/base.py      OntologyProvider ABC（6 个抽象方法）
+  ├── governance/base.py    3 个治理 ABC（ConfidenceScorer, ConflictDetector, EvolutionGate）
+  ├── operators/base.py     SemanticOperator + OperatorMiddleware + OperatorRegistry
+  ├── pipeline/base.py      Stage ABC + Pipeline（linear + branch + switch）
+  └── app.py                SemanticApp + AppConfig（组合根）
+
+src/ 领域实现层
+  ├── providers/            5 个 Provider 实现（Postgres, Neo4j, Claude LLM, BGE-M3, MinIO）
+  ├── ontology/             OntologyRegistry（单例缓存）+ YAMLOntologyProvider
+  ├── governance/           TelecomConfidenceScorer / ConflictDetector / EvolutionGate
+  ├── operators/            15 个 SemanticOperator 实现
+  ├── pipeline/stages/      7 个 Stage 实现（ingest → segment → align → evolve → extract → dedup → index）
+  ├── api/semantic/         9 个算子业务逻辑模块 + router.py
+  ├── crawler/              Spider + ContentExtractor + DocumentNormalizer
+  └── utils/                hashing / confidence / embedding / llm_extract / normalize / text / health / logging
+```
+
+**依赖方向严格遵守**：上层 → 下层接口，不直接访问实现。所有数据库操作通过 Provider 抽象（`app.store` / `app.graph`），不直接 `from src.db.postgres import`。
+
+### A1.2 组合根（Composition Root）
+
+`src/app_factory.py` 的 `build_app()` 统一装配所有组件：
+
+```python
+AppConfig(
+    llm       = ClaudeLLMProvider(settings),
+    embedding = BGEM3EmbeddingProvider(),
+    graph     = Neo4jGraphStore(),
+    store     = PostgresRelationalStore(),
+    objects   = MinioObjectStore(settings),
+    ontology  = YAMLOntologyProvider(registry),
+    confidence_scorer = TelecomConfidenceScorer(),
+    conflict_detector = TelecomConflictDetector(),
+    evolution_gate    = TelecomEvolutionGate(),
+    operators   = ALL_OPERATORS,   # 15 个算子
+    middlewares = [TimingMiddleware(), LoggingMiddleware()],
+    pipeline    = build_pipeline(),  # 7 阶段流水线
+)
+```
+
+### A1.3 本地开发模式
+
+`run_dev.py` 通过 `sys.modules` 补丁将 `src.db.postgres` 替换为 SQLite 内存实现，`src.db.neo4j_client` 替换为 dict 实现，无需 Docker 即可运行 `/lookup`、`/resolve` 等 API。
+
+## A2. 7 阶段知识加工流水线
+
+### A2.1 流水线总览
+
+```
+Pipeline()
+  .add_stage(IngestStage())           # stage1: 采集入库
+  .switch(key=doc_type, ...)          # stage2: 语义切分（按文档类型路由）
+  .add_stage(AlignStage())            # stage3: 本体对齐
+  .add_stage(EvolveStage())           # stage3b: 本体自动学习
+  .add_stage(ExtractStage())          # stage4: 关系抽取
+  .add_stage(DedupStage())            # stage5: 去重融合
+  .add_stage(IndexStage())            # stage6: 图谱索引
+```
+
+### A2.2 Stage 1：Ingest（规则 C1-C5）
+
+- **C3 内容去重**：SHA-256 content_hash，重复文档跳过（status='deduped'）
+- **C4 文本提取**：trafilatura → readability-lxml → 正则降级；纯文本检测（.txt URL 或无 HTML 标签）跳过 HTML 提取器
+- **C5 文档分类**：URL + 标题 + 内容模式匹配 → spec / vendor_doc / pdf / faq / tutorial / tech_article
+- **存储**：原始 HTML → MinIO（content-addressed key: `raw/{sha256}.html`）；清洗文本 → MinIO（`cleaned/{norm_hash}.txt`，存入 `telecom-kb-cleaned` 桶）
+- **纯文本保留**：`.txt` 格式文档（如 RFC）调用 `normalizer.normalize(text, preserve_newlines=True)` 保留行结构，不压缩换行
+
+### A2.3 Stage 2：Segment（规则 S1-S4 + EDU/RST）
+
+- **S1 结构化切分**：自动检测文档格式
+  - Markdown 格式：按 `#` 标题层级切分
+  - RFC 格式：按 `1.  Introduction`、`3.2  Terminology`、`ALLCAPS TITLE` 切分，跳过分页符 `\f`
+  - 纯文本格式：按三空行或分页符切分
+- **S2 语义角色分类**：12 个正则模式覆盖 definition / mechanism / constraint / config / fault / troubleshooting / best_practice / performance / comparison / table / code / ASCII diagram
+- **S3 长度控制**：< 30 token 丢弃；> 1024 token 滑动窗口切片（window=512, overlap=64）
+- **S4 置信度评估**：基于长度区间 / 语义角色识别 / 技术术语密度的启发式评分（0.70 ~ 0.95）
+- **EDU/RST**：相邻 segment 对生成 RST 修辞关系（LLM 优先，规则降级，支持 11 种关系类型）
+
+### A2.4 Stage 3：Align（规则 A1-A5）
+
+- **A1 术语匹配**：
+  - ≤ 3 字符别名使用 `\b` 词边界匹配（避免 “sp” 匹配 “specification”）
+  - \> 3 字符别名使用子串匹配
+  - 别名表来源：OntologyRegistry.alias_map（793+ 条别名，中英双语 + 厂商术语）
+- **A2-A4 标签生成**：canonical / semantic_role / context 三类标签
+- **A5 候选收集**：未匹配的大写术语 → `evolution_candidates` 表，使用 `normalized_form` 作为去重键，跨文档累积 `source_count` 和 `seen_source_doc_ids`
+
+### A2.5 Stage 3b：Evolve（本体自动学习）
+
+这是对设计方案第 15 节”受控演化机制”的完整实现：
+
+- **评分**（仅对 source_count ≥ 2 的候选）：
+  - source_diversity：不同站点覆盖度（distinct site_keys / 3.0）
+  - temporal_stability：候选池驻留天数 / 14
+  - structural_fit：与现有本体节点的 Jaccard 词汇重叠度
+  - synonym_risk：与现有别名的子串重叠度
+  - composite_score：加权综合分（权重来自 `evolution_policy.yaml`）
+- **六项门控**（复用 `TelecomEvolutionGate.evaluate()`）：
+  - min_source_count ≥ 3
+  - min_source_diversity ≥ 0.6
+  - min_temporal_stability ≥ 0.7
+  - min_structural_fit ≥ 0.65
+  - min_composite_score ≥ 0.65
+  - synonym_risk ≤ 0.4
+- **反漂移策略**：候选需在池中驻留 ≥ 7 天才参与门控
+- **自动晋升**：composite_score ≥ 0.85 且有父节点 → 自动写入 Neo4j（`lifecycle_state='candidate'`，区别于人工审核的 `active` 节点）；低于阈值 → `pending_review` 等人工审核
+- **YAML 不自动修改**：遵守”YAML 是 source of truth”原则，自动晋升只写 Neo4j
+
+### A2.6 Stage 4：Extract（规则 R1-R4 + LLM）
+
+- **规则模式**：15 个正则模板（uses_protocol / is_a / part_of / depends_on / requires / encapsulates / establishes / advertises / impacts / causes / implements / forwards_via / protects / monitored_by / configured_by）
+- **LLM 抽取**：使用 OpenAI 兼容 API（支持 DeepSeek / 通义千问 / Claude），每个 segment 发送候选 node_id 列表 + 有效关系列表，返回 JSON 三元组数组
+- **熔断器**：连续 3 次 LLM 失败 → 自动禁用 10 分钟，到期后自动尝试恢复
+- **置信度评分**：`0.30×source_authority + 0.20×extraction_method + 0.20×ontology_fit + 0.20×cross_source + 0.10×temporal`
+
+### A2.7 Stage 5：Dedup（规则 D1-D5）
+
+- **段落去重**：64 位 SimHash（有符号，兼容 PG bigint）→ Hamming distance ≤ 3 → Jaccard ≥ 0.85 确认 → 标记 `lifecycle_state='superseded'`
+- **事实去重**：exact (S,P,O) → 同一 merge_cluster_id
+- **冲突检测**：same S+P, different O → `lifecycle_state='conflicted'` + conflict_records 记录
+
+### A2.8 Stage 6：Index（规则 I1-I3 + Embedding）
+
+- **置信度门控**：segment ≥ 0.5，fact ≥ 0.5
+- **Neo4j 写入**：SourceDocument → KnowledgeSegment（带 `name` 属性用于图可视化）→ Fact → Evidence，含 BELONGS_TO / TAGGED_WITH / RELATED_TO / SUPPORTED_BY / EXTRACTED_FROM 关系
+- **Embedding 写入**（如启用）：segment 文本 → BAAI/bge-m3 → pgvector 列；EDU 标题 + 内容双向量
+
+## A3. 爬虫与反反爬
+
+### A3.1 多策略 HTTP 客户端
+
+```
+fetch(url) 路由逻辑：
+  hostname ∈ _TLS_FINGERPRINT_SITES → curl_cffi（Chrome 指纹模拟）
+  hostname ∈ _SSL_SKIP_VERIFY_SITES → httpx(verify=False)
+  默认 → httpx
+  httpx 返回 403 → 自动降级 curl_cffi
+  SSL 错误 → 自动降级 verify=False
+```
+
+- **User-Agent**：标准 Chrome UA
+- **robots.txt 遵从**：per-site RobotFileParser 缓存
+- **限速**：per-site rate_limit_rps 控制
+- **内容寻址存储**：MinIO key = `raw/{sha256(content)}.html`，相同内容幂等，不同内容不覆盖
+
+### A3.2 Worker 调度
+
+- **种子 URL**：3 个数据源（RFC Editor 4 篇 / 3GPP 1 篇 / ITU-T 1 篇）
+- **失败重试**：3 次渐进退避（5min → 30min → 120min）
+- **空转退避**：前 3 次 INFO 级别 30s 间隔，之后 DEBUG 级别指数退避至 5 分钟上限
+
+## A4. 本体工程
+
+### A4.1 五层知识模型实例化
+
+| 层 | YAML 文件 | 节点数 | 示例 |
+|---|---|---|---|
+| concept | ip_network.yaml | 74 | BGP, OSPF, TCP, UDP, IP, VLAN, MPLS... |
+| mechanism | ip_network_mechanisms.yaml | 24 | PathVectorPropagation, SPFCalculation... |
+| method | ip_network_methods.yaml | 22 | VRFProvisioningMethod, BGPPeeringMethod... |
+| condition | ip_network_conditions.yaml | 20 | PreferVRFForIsolationRule, RouteLeakRisk... |
+| scenario | ip_network_scenarios.yaml | 13 | MPLSL3VPNProvisioningScenario... |
+| **合计** | | **153** | |
+
+- **别名词典**：834 条（lexicon/aliases.yaml 156 条 + 各 domain YAML 内联别名）
+- **受控关系类型**：54 种（top/relations.yaml）
+- **新增核心节点（v0.2.0）**：TCP / UDP / IP / HTTP / TLS / SSH / Transport Layer / Application Layer
+
+### A4.2 本体加载流程
+
+```
+YAML (ontology/) → scripts/load_ontology.py → Neo4j (OntologyNode + SUBCLASS_OF + Alias + ALIAS_OF)
+                                             → PostgreSQL (lexicon_aliases 表)
+                 → OntologyRegistry.from_default() → 内存单例（alias_map + nodes + relation_ids）
+                 → YAMLOntologyProvider → 包装为 semcore OntologyProvider 接口
+```
+
+## A5. LLM 集成
+
+### A5.1 多 API 兼容
+
+`LLMExtractor` 自动检测 API 风格：
+- `api.anthropic.com` → Anthropic Messages API
+- `api.deepseek.com` / `dashscope.aliyuncs.com` / 其他含 `chat/completions` 的 → OpenAI 兼容 API
+- **超时**：180 秒（大段文本抽取需要较长响应时间）
+- **健康检查**：独立 15 秒短超时 ping，不阻塞启动
+
+### A5.2 熔断器模式
+
+```
+连续失败计数 < 3 → 正常调用
+连续失败 ≥ 3     → 禁用 LLM 600 秒（10 分钟）
+冷却期结束       → 重置计数，允许重试
+任何成功调用     → 立即重置计数
+```
+
+### A5.3 LLM 降级策略
+
+- **启动**：LLM 不可用不阻止应用启动（PostgreSQL + Neo4j 才是必需）
+- **Stage 2 RST**：LLM 不可用 → 规则映射表降级
+- **Stage 2 标题**：LLM 不可用 → section_title → 首句截断
+- **Stage 4 抽取**：LLM 不可用 → 仅规则模式（15 个正则模板）
+
+## A6. 存储实现
+
+### A6.1 PostgreSQL（13+ 张表）
+
+核心表：source_registry / crawl_tasks / documents / segments / segment_tags / facts / evidence / conflict_records / extraction_jobs / ontology_versions / evolution_candidates / lexicon_aliases / t_edu_detail / t_rst_relation
+
+### A6.2 Neo4j（运行时语义图）
+
+节点类型：OntologyNode (153) / KnowledgeSegment / SourceDocument / Fact / Evidence / Alias (155+)
+
+关系类型：SUBCLASS_OF (65) / ALIAS_OF (155+) / TAGGED_WITH / BELONGS_TO / RELATED_TO / SUPPORTED_BY / EXTRACTED_FROM
+
+### A6.3 MinIO（对象存储）
+
+- `telecom-kb-raw`：原始 HTML（content-addressed key）
+- `telecom-kb-cleaned`：清洗后文本（normalized_hash key）
+
+## A7. 已知限制与后续方向
+
+1. **LLM 抽取速度**：每个 segment 独立调用 LLM（~90s/次），6 篇文档 292 个 segment 需要数小时。待优化：批量 segment 合并 prompt / 减少 candidate_node_ids 数量 / 跳过不必要的标题生成
+2. **规则抽取召回率**：15 个正则模板对 RFC 自然语言覆盖有限，核心依赖 LLM
+3. **Embedding 未启用**：BAAI/bge-m3 模型需手动下载，`EMBEDDING_ENABLED=false`
+4. **向量检索算子**：`semantic_search` / `edu_search` 已实现但依赖 embedding 启用
+5. **候选概念自动晋升**：需要跨多文档积累 + 7 天驻留期，首轮单批数据不会触发
+6. **厂商文档采集**：种子 URL 仅含标准组织（RFC/3GPP/ITU），未接入 Cisco/Huawei 文档
