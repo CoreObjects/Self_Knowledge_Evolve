@@ -88,7 +88,6 @@ src/
       normalizer.py        ← 去噪、归一化、hash
     stages/                ← stage1~stage6
     pipeline_factory.py    ← build_pipeline()
-    runner.py              ← legacy 批量 runner
   providers/               ← semcore Provider 实现（postgres/crawler_postgres/neo4j/llm/embedding/minio）
   ontology/
     registry.py            ← 内存本体注册表（YAML loader）

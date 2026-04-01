@@ -2486,7 +2486,6 @@ Self_Knowledge_Evolve/
 │   │
 │   ├── pipeline/
 │   │   ├── pipeline_factory.py    build_pipeline() → 7 阶段
-│   │   ├── runner.py              批量 runner（使用 source_doc_id 驱动）
 │   │   ├── preprocessing/
 │   │   │   ├── extractor.py       HTML 正文提取（trafilatura/readability）
 │   │   │   └── normalizer.py      去噪归一化 + hash

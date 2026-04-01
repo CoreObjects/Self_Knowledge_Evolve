@@ -1,643 +1,383 @@
 # Telecom Semantic Knowledge Base
 
-A governance-first semantic knowledge infrastructure for the network & telecommunications domain.
-Transforms public web corpora into computable, traceable, evolvable knowledge — organized by a domain ontology, stored across multi-modal backends, and exposed through a unified semantic operator API.
+面向网络通信领域的可治理、可演化、带溯源的语义知识基础设施。
+
+将公开文档（RFC、厂商手册、技术白皮书等）转化为结构化、可计算的知识对象，通过领域本体组织，经多模存储持久化，由语义算子 API 对外服务。
 
 ---
 
-## Table of Contents
+## 核心能力
 
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Project Structure](#project-structure)
-- [Quick Start](#quick-start)
-- [Dev Mode (no Docker)](#dev-mode-no-docker)
-- [Configuration](#configuration)
-- [Database Initialization](#database-initialization)
-- [Ontology](#ontology)
-- [Pipeline](#pipeline)
-- [Semantic API](#semantic-api)
-- [Development Roadmap](#development-roadmap)
-- [Design Documents](#design-documents)
+| 能力 | 说明 |
+|------|------|
+| **本体锚定的知识组织** | 5 层领域本体（概念/机制/方法/条件/场景），153 节点 + 54 种受控关系 + 156 条别名 |
+| **多源数据接入** | 爬虫、文件导入、API 上传均可灌入系统，Pipeline 不感知数据来源 |
+| **7 阶段处理流水线** | 清洗 → 切段 → 本体对齐 → 本体演化 → 关系抽取 → 去重 → 图谱索引 |
+| **21 种 RST 语篇关系** | 基于修辞结构理论的通用语篇逻辑关系，6 大类 |
+| **多模存储** | PostgreSQL（知识+治理）、Neo4j（图谱）、pgvector（向量）、MinIO（文档） |
+| **15 个语义算子** | 术语查询、图遍历、依赖分析、故障影响传播、语义搜索、本体演化 |
+| **受控演化** | 新概念进入候选池 → 五维评分 → 六项门控 → 人工/自动晋升 |
 
----
+### 首版领域范围：IP 数通网络
 
-## Overview
-
-This system is **not** a plain vector search engine or a web scraper.
-It is a semantic knowledge infrastructure with five core capabilities:
-
-| Capability | Description |
-|---|---|
-| **Ontology-anchored organization** | All knowledge is tagged against a versioned 5-layer domain ontology — stable concepts, controlled relations, alias resolution |
-| **Knowledge extraction pipeline** | 6-stage pipeline converts raw HTML → clean segments → ontology-aligned facts + evidence |
-| **Multi-modal storage** | PostgreSQL (metadata), Neo4j (graph), pgvector (segment embeddings), MinIO (raw documents) |
-| **Semantic operator API** | 15 operators for lookup, graph traversal, dependency analysis, impact propagation, semantic search, and ontology evolution |
-| **Controlled evolution** | New concepts enter a candidate pool and pass a scored gate before touching the core ontology |
-
-### First-version scope: IP / Data Communication Network
-
-Ethernet · VLAN · STP/RSTP/MSTP · LACP · OSPF · IS-IS · BGP · MPLS · LDP · SR-MPLS · SRv6 · EVPN · VXLAN · L3VPN · VRF · QoS · ACL · NAT · IPsec · BFD · NETCONF · YANG · Telemetry
+Ethernet · VLAN · STP · LACP · OSPF · IS-IS · BGP · MPLS · SR-MPLS · SRv6 · EVPN · VXLAN · L3VPN · VRF · QoS · ACL · NAT · BFD · NETCONF · YANG
 
 ---
 
-## Architecture
+## 系统逻辑架构
 
 ```
-┌───────────────────────────────────────────────────────────────────┐
-│                    semcore Framework (semcore/)                    │
-│   ABCs: Provider · Pipeline · Governance · Operator · App         │
-└───────────────────────────────┬───────────────────────────────────┘
-                                │ implements
-┌───────────────────────────────▼───────────────────────────────────┐
-│                        Ontology Core Layer                        │
-│   YAML definitions  →  OntologyRegistry  →  Neo4j OntologyNodes   │
-└───────────────────────────────┬───────────────────────────────────┘
-                                │ semantic skeleton
-┌───────────────────────────────▼───────────────────────────────────┐
-│                      Corpus Ingestion Layer                       │
-│   Spider (robots/rate-limit)  →  Extractor  →  Normalizer         │
-└───────────────────────────────┬───────────────────────────────────┘
-                                │ clean text
-┌───────────────────────────────▼───────────────────────────────────┐
-│                     Knowledge Processing Pipeline                 │
-│  Stage 1 Ingest → Stage 2 Segment → Stage 3 Align                │
-│  Stage 4 Extract → Stage 5 Dedup  → Stage 6 Index + Embed        │
-└──────┬──────────────────┬──────────────────────┬──────────────────┘
-       │                  │                      │
-┌──────▼──────┐  ┌────────▼────────┐  ┌─────────▼──────────┐
-│ PostgreSQL  │  │     Neo4j       │  │ pgvector / MinIO   │
-│  metadata   │  │  ontology+graph │  │ embeddings + docs  │
-└──────┬──────┘  └────────┬────────┘  └─────────┬──────────┘
-       └──────────────────┴──────────────────────┘
-                           │
-┌──────────────────────────▼──────────────────────────────────────┐
-│              Semantic Operator API  (FastAPI / semcore)          │
-│  lookup · resolve · expand · filter · path · dependency         │
-│  impact_propagate · evidence_rank · conflict_detect             │
-│  fact_merge · candidate_discover · attach_score · evolution_gate│
-│  semantic_search · edu_search                                   │
-└─────────────────────────────────────────────────────────────────┘
+┌─ 上层入口 ──────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│  FastAPI REST API (router.py)           worker.py                           │
+│    └─ 15 语义算子端点                     └─ 爬取 + Pipeline 调度            │
+│         ↓                                      ↓                            │
+│  ┌─ SemanticApp ──────────────────────────────────────────────────────────┐ │
+│  │  app.query(op_name)          app.ingest(source_doc_id)                 │ │
+│  │       ↓                           ↓                                    │ │
+│  │  OperatorRegistry            Pipeline (7 stages)                       │ │
+│  │  + Middleware 链              linear / branch / switch                  │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
+         │                              │
+         │  ┌───────────────────────────┘
+         │  │
+┌─ 领域实现层 ──────────────────────────────────────────────────────────────────┐
+│                                                                               │
+│  ┌─ 本体层（统一语义骨架）──────────────────────────────────────────────────┐ │
+│  │  YAML (ontology/) ── 唯一源头，版本控制                                  │ │
+│  │       ↓ load_ontology.py                                                 │ │
+│  │  OntologyRegistry (内存) ── alias_map / relation_ids / nodes             │ │
+│  │       ↓ 同步投影                                                         │ │
+│  │  Neo4j (5 类 label)     PG lexicon_aliases     PG governance.versions    │ │
+│  │                                                                          │ │
+│  │  本体统一三个存储系统的 schema：                                          │ │
+│  │  · Neo4j 节点/边类型 = 本体定义的 5 层 + 54 种关系                       │ │
+│  │  · PG segment_tags.ontology_node_id = 本体 node_id                       │ │
+│  │  · PG facts.subject/object = 本体 node_id                                │ │
+│  │  · PG lexicon_aliases = 本体别名镜像                                     │ │
+│  └──────────────────────────────────────────────────────────────────────────┘ │
+│                                                                               │
+│  ┌─ 治理层 ────────────────┐  ┌─ 流水线层 ──────────────────────────────┐   │
+│  │ ConfidenceScorer        │  │ preprocessing/                          │   │
+│  │   5 维置信度加权         │  │   extractor (正文提取)                  │   │
+│  │ ConflictDetector        │  │   normalizer (去噪归一化)               │   │
+│  │   same S+P diff O       │  │ stages/                                 │   │
+│  │ EvolutionGate           │  │   1.清洗 → 2.切段+RST → 3.对齐         │   │
+│  │   6 项门控              │  │   → 3b.演化 → 4.抽取 → 5.去重 → 6.索引 │   │
+│  └─────────────────────────┘  └─────────────────────────────────────────┘   │
+│                                                                               │
+│  ┌─ 算子层 (15 个 SemanticOperator) ──────────────────────────────────────┐ │
+│  │ lookup · resolve · expand · filter · path · dependency_closure          │ │
+│  │ impact_propagate · evidence_rank · conflict_detect · fact_merge         │ │
+│  │ candidate_discover · attach_score · evolution_gate                      │ │
+│  │ semantic_search · edu_search                                            │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+└───────────────────────────────────────────────────────────────────────────────┘
+         │
+┌─ semcore 框架层（零外部依赖 ABCs）────────────────────────────────────────────┐
+│  providers/base.py   LLMProvider · EmbeddingProvider · GraphStore ·           │
+│                      RelationalStore · ObjectStore                            │
+│  ontology/base.py    OntologyProvider (get_node / resolve_alias / version)   │
+│  governance/base.py  ConfidenceScorer · ConflictDetector · EvolutionGate     │
+│  operators/base.py   SemanticOperator · OperatorMiddleware · OperatorRegistry│
+│  pipeline/base.py    Stage · Pipeline (LinearNode / BranchNode / SwitchNode) │
+│  app.py              AppConfig (纯数据) → SemanticApp (组合根)               │
+└──────────────────────────────────────────────────────────────────────────────┘
+         │
+┌─ 基础设施层 ─────────────────────────────────────────────────────────────────┐
+│  PostgreSQL telecom_kb        Neo4j              MinIO                        │
+│    public: 知识数据              本体图 + 知识图谱    raw/ + cleaned/          │
+│    governance: 治理数据                                                       │
+│  PostgreSQL telecom_crawler   BAAI/bge-m3                                    │
+│    爬虫调度数据                  1024 维向量 → PG pgvector                     │
+└──────────────────────────────────────────────────────────────────────────────┘
+         │
+┌─ 外部数据源（Pipeline 之外）─────────────────────────────────────────────────┐
+│  Spider 爬虫 · 文件导入 · API 上传  → MinIO(raw/) + documents(status='raw')  │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Storage roles
+**关键设计原则**：
+- **本体是统一骨架** — YAML 是唯一源头，同步投影到 Neo4j（图遍历）、PG lexicon_aliases（SQL 查询）、内存 OntologyRegistry（Pipeline 对齐），三个存储的 schema 均由本体定义约束
+- **semcore 是纯抽象底座** — 零依赖 ABCs，领域实现全部可替换
+- **SemanticApp 是唯一入口** — `app.query()` 走算子，`app.ingest()` 走流水线，上层 API/Worker 只和 SemanticApp 交互
+- **数据源与 Pipeline 解耦** — 任何能往 documents 表 + MinIO 写数据的进程都是合法数据源
 
-| Store | Role |
-|---|---|
-| **PostgreSQL** | Source registry, crawl tasks, document metadata, segments, facts, evidence, conflict records, ontology versions, evolution candidates |
-| **Neo4j** | Ontology nodes, concept graph, fact nodes, evidence nodes, TAGGED_WITH / SUPPORTED_BY / BELONGS_TO edges |
-| **pgvector** | Segment embeddings (`embedding` column on `segments`); title/content vectors on `t_edu_detail` |
-| **MinIO / S3** | Raw HTML snapshots, cleaned text, PDF attachments |
+### 存储分工
+
+| 存储 | 内容 | 本体关联 |
+|------|------|----------|
+| **PG telecom_kb** (public) | documents, segments, facts, evidence, segment_tags, lexicon_aliases, t_rst_relation | segment_tags/facts 的 node_id 引用本体；lexicon_aliases 镜像本体别名 |
+| **PG telecom_kb** (governance) | evolution_candidates, conflict_records, review_records, ontology_versions | 治理本体生命周期 |
+| **PG telecom_crawler** | source_registry, crawl_tasks, extraction_jobs | 无本体关联 |
+| **Neo4j** | 5 类本体节点 + KnowledgeSegment/Fact/Evidence + 关系边 | 本体的运行时图投影 |
+| **pgvector** | segments.embedding / title_vec / content_vec (1024 维) | 向量索引，不直接关联本体 |
+| **MinIO** | raw/ (原始文档), cleaned/ (清洗后文本) | 不关联本体 |
 
 ---
 
-## Project Structure
+## 项目结构
 
 ```
 Self_Knowledge_Evolve/
 │
-├── semcore/                                # Reusable framework package (zero external deps)
-│   └── semcore/
-│       ├── core/types.py                   # Domain dataclasses: OntologyNode, Fact, Segment …
-│       ├── core/context.py                 # PipelineContext (typed fields + stage_outputs + meta)
-│       ├── providers/base.py               # ABCs: LLMProvider, EmbeddingProvider, GraphStore …
-│       ├── ontology/base.py                # OntologyProvider ABC
-│       ├── governance/base.py              # ConfidenceScorer, ConflictDetector, EvolutionGate ABCs
-│       ├── operators/base.py               # SemanticOperator, OperatorMiddleware, OperatorRegistry
-│       ├── pipeline/base.py                # Stage ABC, Pipeline (linear + branch + switch routing)
-│       └── app.py                          # SemanticApp + AppConfig (composition root)
-│
-├── docs/
-│   ├── semcore-framework-design.md         # Framework design decisions
-│   ├── refactoring-plan.md                 # src/ → semcore migration plan
-│   ├── architecture-decisions.md           # ADR log (embedding, storage, LLM)
-│   ├── telecom-semantic-kb-system-design.md
-│   ├── telecom-ontology-design.md
-│   └── development-plan-detailed.md
-│
-├── ontology/                               # Ontology source of truth (YAML)
-│   ├── top/
-│   │   └── relations.yaml                  # 54 controlled relation types
-│   ├── domains/
-│   │   ├── ip_network.yaml                 # ~66 concept nodes
-│   │   ├── ip_network_mechanisms.yaml      # 24 mechanism nodes
-│   │   ├── ip_network_methods.yaml         # 22 method nodes
-│   │   ├── ip_network_conditions.yaml      # 20 condition nodes
-│   │   └── ip_network_scenarios.yaml       # 13 scenario nodes
-│   ├── lexicon/
-│   │   └── aliases.yaml                    # EN/ZH aliases + vendor terms (793 entries)
-│   └── governance/
-│       └── evolution_policy.yaml           # Anti-drift thresholds
-│
-├── scripts/
-│   ├── init_postgres.sql                   # DDL: 13 tables + pgvector extension
-│   ├── init_neo4j.py                       # Neo4j constraints + indexes
-│   └── load_ontology.py                    # YAML → Neo4j + PG lexicon
+├── semcore/semcore/                    # 框架包（零外部依赖）
+│   ├── core/types.py                   # 领域数据类：OntologyNode, Fact, Segment …
+│   ├── core/context.py                 # PipelineContext
+│   ├── providers/base.py               # ABCs: LLMProvider, EmbeddingProvider, GraphStore …
+│   ├── ontology/base.py                # OntologyProvider ABC
+│   ├── governance/base.py              # ConfidenceScorer, ConflictDetector, EvolutionGate ABCs
+│   ├── operators/base.py               # SemanticOperator + OperatorRegistry + Middleware
+│   ├── pipeline/base.py                # Stage ABC, Pipeline (linear/branch/switch)
+│   └── app.py                          # SemanticApp + AppConfig
 │
 ├── src/
-│   ├── app.py                              # FastAPI entry point (production)
-│   ├── app_factory.py                      # build_app() + get_app() singleton
-│   ├── config/
-│   │   └── settings.py                     # Pydantic settings, reads .env
+│   ├── app.py                          # FastAPI 入口
+│   ├── app_factory.py                  # build_app() 组合根
+│   ├── config/settings.py              # Pydantic Settings (.env)
 │   ├── db/
-│   │   ├── postgres.py                     # PG connection pool + helpers
-│   │   └── neo4j_client.py                 # Neo4j driver wrapper
-│   ├── dev/                                # In-memory stubs for local dev
-│   │   ├── fake_postgres.py                # SQLite :memory: backend
-│   │   ├── fake_neo4j.py                   # Dict-backed Neo4j stub
-│   │   └── seed.py                         # Seeds stubs from YAML ontology
-│   ├── providers/                          # semcore Provider implementations
-│   │   ├── postgres_store.py
-│   │   ├── neo4j_store.py
-│   │   ├── anthropic_llm.py
-│   │   ├── bge_m3_embedding.py
-│   │   └── minio_store.py
-│   ├── ontology/
-│   │   ├── registry.py                     # In-memory OntologyRegistry (YAML loader)
-│   │   ├── validator.py                    # YAML structural validation
-│   │   └── yaml_provider.py                # OntologyProvider backed by registry
-│   ├── governance/
-│   │   ├── confidence_scorer.py            # TelecomConfidenceScorer
-│   │   ├── conflict_detector.py            # TelecomConflictDetector
-│   │   └── evolution_gate.py               # TelecomEvolutionGate (6 gate checks)
-│   ├── operators/                          # 15 SemanticOperator implementations
-│   │   ├── __init__.py                     # ALL_OPERATORS list
-│   │   ├── lookup_op.py
-│   │   ├── resolve_op.py
-│   │   ├── expand_op.py
-│   │   ├── filter_op.py
-│   │   ├── path_op.py
-│   │   ├── dependency_op.py
-│   │   ├── impact_op.py
-│   │   ├── evidence_op.py
-│   │   ├── evolution_op.py
-│   │   └── search_op.py
+│   │   ├── postgres.py                 # 知识库连接池
+│   │   ├── crawler_postgres.py         # 爬虫库连接池
+│   │   └── neo4j_client.py             # Neo4j driver
+│   ├── providers/                      # 6 个 Provider 实现
+│   ├── ontology/                       # OntologyRegistry + YAML 校验
+│   ├── governance/                     # 置信度/冲突/演化门控
 │   ├── pipeline/
-│   │   ├── pipeline_factory.py             # build_pipeline() with switch routing
-│   │   └── stages/
-│   │       ├── stage1_ingest.py            # Rules C1–C5: fetch, dedup, doc_type
-│   │       ├── stage2_segment.py           # Rules S1–S4: structural+semantic split
-│   │       ├── stage3_align.py             # Rules A1–A5: ontology tagging
-│   │       ├── stage4_extract.py           # Rules R1–R4: relation extraction
-│   │       ├── stage5_dedup.py             # Rules D1–D5: SimHash + fact dedup
-│   │       └── stage6_index.py             # Rules I1–I3: Neo4j indexing + embedding
-│   ├── utils/
-│   │   ├── text.py                         # Normalization, token count, truncate
-│   │   ├── hashing.py                      # SHA-256, SimHash, Hamming, Jaccard
-│   │   ├── confidence.py                   # Weighted confidence scoring
-│   │   ├── embedding.py                    # BAAI/bge-m3 embedding + pg literal helper
-│   │   ├── llm_extract.py                  # Claude API relation extraction
-│   │   └── logging.py                      # Structured logging setup
-│   ├── api/
-│   │   └── semantic/
-│   │       ├── lookup.py                   # Term → ontology node
-│   │       ├── resolve.py                  # Alias → canonical node
-│   │       ├── expand.py                   # Node neighbourhood traversal
-│   │       ├── filter.py                   # Parameterized fact/segment filter
-│   │       ├── path.py                     # Shortest path between nodes
-│   │       ├── dependency.py               # Dependency closure BFS
-│   │       ├── impact.py                   # Fault impact propagation BFS
-│   │       ├── evidence.py                 # Evidence rank, conflict detect, fact merge
-│   │       ├── evolution.py                # Candidate discover, attach score, gate
-│   │       └── router.py                   # FastAPI router → OperatorRegistry
-│   └── crawler/
-│       ├── spider.py                       # HTTP fetch, robots.txt, rate limit
-│       ├── extractor.py                    # trafilatura + readability extraction
-│       └── normalizer.py                   # Boilerplate removal, hash computation
+│   │   ├── preprocessing/              # 文本预处理（extractor + normalizer）
+│   │   ├── pipeline_factory.py         # build_pipeline()
+│   │   └── stages/                     # 7 个 Stage 实现
+│   ├── operators/                      # 15 个 SemanticOperator
+│   ├── api/semantic/                   # 算子业务逻辑 + FastAPI router
+│   ├── crawler/                        # Spider（Pipeline 外部数据源）
+│   ├── utils/                          # 文本/哈希/置信度/嵌入/LLM
+│   └── dev/                            # 内存替代（fake_postgres/fake_neo4j）
 │
-├── tests/
-├── run_dev.py                              # Dev entry point (in-memory, no Docker)
-├── docker-compose.yml                      # PostgreSQL + Neo4j containers
-├── .env.example                            # Connection config template
-├── requirements.txt
-└── README.md
+├── ontology/                           # 本体 YAML（唯一源头）
+│   ├── domains/                        # 5 个领域文件，153 节点
+│   ├── lexicon/aliases.yaml            # 156 条别名
+│   ├── top/relations.yaml              # 54 种关系类型
+│   └── governance/evolution_policy.yaml
+│
+├── scripts/
+│   ├── init_postgres.sql               # 知识库 DDL (public + governance)
+│   ├── init_crawler_postgres.sql       # 爬虫库 DDL
+│   ├── init_neo4j.py                   # 约束 + 索引
+│   ├── load_ontology.py                # YAML → Neo4j + PG
+│   └── migrations/                     # 增量迁移脚本
+│
+├── worker.py                           # 后台 Worker（爬取 + Pipeline）
+└── run_dev.py                          # 本地开发（内存模式，零外部依赖）
 ```
 
 ---
 
-## Quick Start
+## 快速开始
 
-### Prerequisites
-
-- Python 3.11+
-- Docker (for PostgreSQL and Neo4j)
-
-### 1. Clone and install
+### 本地开发（无需 Docker）
 
 ```bash
-git clone git@github.com:ZoeRen-pp/Self_Knowledge_Evolve.git
+git clone https://github.com/xuanx-ai/Self_Knowledge_Evolve.git
 cd Self_Knowledge_Evolve
 
 python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+.venv\Scripts\activate        # Linux/Mac: source .venv/bin/activate
 pip install -r requirements.txt
+
+python run_dev.py
+# → http://127.0.0.1:8000/docs
 ```
 
-### 2. Configure connections
+内存模式自动从 YAML 本体 seed 数据，可直接测试：
+
+```bash
+curl http://localhost:8000/health
+curl "http://localhost:8000/api/v1/semantic/lookup?term=BGP"
+curl "http://localhost:8000/api/v1/semantic/resolve?alias=border+gateway+protocol"
+```
+
+### 生产部署
 
 ```bash
 cp .env.example .env
-```
+# 编辑 .env 填入数据库连接信息
 
-Edit `.env` — minimum required fields:
-
-```dotenv
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
-POSTGRES_DB=telecom_kb
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=your_password
-
-NEO4J_URI=bolt://localhost:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=your_password
-```
-
-### 3. Start infrastructure
-
-```bash
-docker-compose up -d
-```
-
-### 4. Initialize databases
-
-```bash
-# PostgreSQL: create all 13 tables + pgvector extension
+# 初始化数据库
 psql -h localhost -U postgres -d telecom_kb -f scripts/init_postgres.sql
-
-# Neo4j: create uniqueness constraints and lookup indexes
+psql -h localhost -U postgres -d telecom_crawler -f scripts/init_crawler_postgres.sql
 python scripts/init_neo4j.py
-```
 
-### 5. Load the ontology
-
-```bash
-# Dry-run (validate only, no writes)
-python scripts/load_ontology.py --dry-run
-
-# Load all domains + aliases into Neo4j + PostgreSQL lexicon
+# 加载本体
 python scripts/load_ontology.py
-```
 
-### 6. Start the API server
+# 启动 API
+uvicorn src.app:app --host 0.0.0.0 --port 8000
 
-```bash
-uvicorn src.app:app --host 0.0.0.0 --port 8000 --reload
-```
-
-Open **http://localhost:8000/docs** for the interactive Swagger UI.
-
-```bash
-curl http://localhost:8000/health
-# {"postgres": true, "neo4j": true, "status": "ok"}
+# 启动 Worker（爬取 + Pipeline）
+python worker.py
 ```
 
 ---
 
-## Dev Mode (no Docker)
+## 配置
 
-Run the full API against in-memory SQLite + dict stores, seeded from YAML ontology.
-No PostgreSQL, Neo4j, or any external service required.
+所有配置通过 `.env` 读取，详见 `.env.example`。
 
-```bash
-python run_dev.py
-# or
-uvicorn run_dev:app --port 8000
-```
-
-**How it works:** `run_dev.py` injects `src.dev.fake_postgres` and `src.dev.fake_neo4j` into
-`sys.modules` before any operator imports, then seeds them from the YAML ontology files.
-The production `src/app.py` and all `.env` settings are untouched.
-
-**Verified endpoints in dev mode:**
-
-```bash
-curl http://localhost:8000/health
-# {"postgres": true, "neo4j": true, "status": "ok"}
-
-curl "http://localhost:8000/api/v1/semantic/lookup?term=BGP"
-# matched_node: IP.BGP, match_type: exact
-
-curl "http://localhost:8000/api/v1/semantic/resolve?alias=border+gateway+protocol"
-# resolved: {node_id: IP.BGP, confidence: 0.9}
-```
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `POSTGRES_HOST/PORT/DB/USER/PASSWORD` | — | 知识库连接（必填） |
+| `CRAWLER_POSTGRES_*` | 同主库 | 爬虫库连接（留空则复用主库参数） |
+| `NEO4J_URI/USER/PASSWORD` | bolt://localhost:7687 | Neo4j 连接 |
+| `MINIO_ENDPOINT/ACCESS_KEY/SECRET_KEY` | — | MinIO 连接 |
+| `LLM_ENABLED` | false | 启用 LLM 关系抽取 |
+| `LLM_API_KEY` | — | Anthropic/OpenAI/DeepSeek API Key |
+| `EMBEDDING_ENABLED` | false | 启用向量嵌入（需下载 BAAI/bge-m3） |
+| `ONTOLOGY_VERSION` | v0.2.0 | 当前本体版本标记 |
 
 ---
 
-## Configuration
+## 流水线
 
-All settings are read from `.env` via `src/config/settings.py`.
+7 阶段处理流水线，输入为 `source_doc_id`，从 documents 表 + MinIO 开始。
 
-| Variable | Default | Description |
-|---|---|---|
-| `POSTGRES_HOST` | `""` | PostgreSQL host (required) |
-| `POSTGRES_PORT` | `""` | PostgreSQL port (required) |
-| `POSTGRES_DB` | `""` | Database name (required) |
-| `POSTGRES_USER` | `""` | Username (required) |
-| `POSTGRES_PASSWORD` | `""` | Password (required) |
-| `POSTGRES_POOL_MIN` | `""` | Min pool connections (required) |
-| `POSTGRES_POOL_MAX` | `""` | Max pool connections (required) |
-| `NEO4J_URI` | `bolt://localhost:7687` | Neo4j bolt URI |
-| `NEO4J_USER` | `neo4j` | Neo4j username |
-| `NEO4J_PASSWORD` | `changeme` | Neo4j password |
-| `NEO4J_DATABASE` | `neo4j` | Neo4j database name |
-| `MINIO_ENDPOINT` | `""` | MinIO endpoint (required) |
-| `MINIO_ACCESS_KEY` | `minioadmin` | MinIO access key |
-| `MINIO_SECRET_KEY` | `minioadmin` | MinIO secret key |
-| `LLM_API_KEY` | `""` | Anthropic API key (Claude for relation extraction) |
-| `LLM_ENABLED` | `false` | Enable LLM extraction in stage 4 |
-| `EMBEDDING_MODEL` | `BAAI/bge-m3` | Sentence-transformer model |
-| `EMBEDDING_ENABLED` | `false` | Enable embedding generation in stage 6 |
-| `EMBEDDING_DIM` | `1024` | Vector dimension |
-| `ONTOLOGY_VERSION` | `v0.2.0` | Active ontology version tag |
-| `LOG_LEVEL` | `INFO` | Logging level |
-| `STARTUP_HEALTH_REQUIRED` | `true` | Fail startup if health check is not OK |
+```
+documents(raw) + MinIO
+    │
+    ▼ Stage 1 — 清洗 (C3-C5)
+    │  正文提取 → 去噪归一化 → 质量门控 → 文档类型检测
+    │
+    ▼ Stage 2 — 切段 (S1-S4 + RST)
+    │  结构切分 → 语义角色分类 → 长度控制 → RST 语篇关系（21种）
+    │
+    ▼ Stage 3 — 本体对齐 (A1-A5)
+    │  别名匹配 → 五层标签 → 候选术语发现
+    │
+    ▼ Stage 3b — 本体演化
+    │  五维评分 → 六项门控 → 自动晋升/待审
+    │
+    ▼ Stage 4 — 关系抽取 (R1-R4)
+    │  15 正则模式 + LLM → (S, P, O) 三元组 + 置信度
+    │
+    ▼ Stage 5 — 去重 (D1-D5)
+    │  SimHash 段落去重 → 事实合并 → 冲突检测
+    │
+    ▼ Stage 6 — 索引 (I1-I3)
+       置信度门控 → Neo4j 入图 → 向量嵌入
+       documents.status = 'indexed'
+```
+
+### 数据源接入
+
+任何数据源只需两步即可接入 Pipeline：
+1. 往 `documents` 表插入一条 `status='raw'` 的记录
+2. 往 MinIO `raw/` 存放原始文档
+
+Pipeline worker 会自动捞取并处理。
 
 ---
 
-## Database Initialization
-
-### PostgreSQL tables (13)
-
-| Table | Purpose |
-|---|---|
-| `source_registry` | Site whitelist, source rank (S/A/B/C), crawl config |
-| `crawl_tasks` | URL queue, status tracking, retry count |
-| `documents` | Document metadata, content hashes, dedup grouping |
-| `segments` | Semantic segments with SimHash and pgvector `embedding` column |
-| `segment_tags` | Canonical / semantic_role / context tags per segment |
-| `facts` | Normalized SPO triples with confidence and lifecycle |
-| `evidence` | Source evidence linking facts to segments and documents |
-| `conflict_records` | Detected contradictions between facts |
-| `ontology_versions` | Versioned ontology snapshots and change log |
-| `evolution_candidates` | Candidate new concepts with scoring dimensions |
-| `review_records` | Audit trail for all human review actions |
-| `lexicon_aliases` | Mirror of ontology aliases for SQL-side resolution |
-| `t_edu_detail` | Educational content with `title_vec` + `content_vec` for dual-vector search |
-
-### Neo4j node labels
-
-`OntologyNode` · `MechanismNode` · `MethodNode` · `ConditionRuleNode` · `ScenarioPatternNode`
-`KnowledgeSegment` · `SourceDocument` · `Fact` · `Evidence`
-
-### Neo4j edge types (key)
-
-`SUBCLASS_OF` · `RELATED_TO` · `DEPENDS_ON` · `USES` · `IMPACTS` · `CAUSES`
-`SUPPORTED_BY` · `EXTRACTED_FROM` · `BELONGS_TO` · `TAGGED_WITH` · `ALIAS_OF` · `CONTRADICTS`
-
----
-
-## Ontology
-
-The ontology lives in `ontology/` YAML files — **these are the source of truth**, not Neo4j.
-Neo4j is the runtime projection; PostgreSQL tracks versions and governance.
-
-### Five knowledge layers
-
-| Layer | Node type | Count | Example |
-|---|---|---|---|
-| **concept** | `OntologyNode` | 66 | IP.BGP, IP.OSPF, IP.EVPN |
-| **mechanism** | `MechanismNode` | 24 | MECH.BGP_ROUTE_REFLECTOR, MECH.ECMP |
-| **method** | `MethodNode` | 22 | METHOD.BGP_ROUTE_FILTERING, METHOD.QOS_MARKING |
-| **condition** | `ConditionRuleNode` | 20 | COND.BGP_SESSION_DOWN, COND.OSPF_ADJACENCY_FAIL |
-| **scenario** | `ScenarioPatternNode` | 13 | SCENE.DC_FABRIC, SCENE.WAN_SDWAN |
-
-### Modification workflow
-
-```
-Edit YAML file
-     ↓
-python scripts/load_ontology.py --dry-run   ← validate
-     ↓
-Human review (for domain/core changes)
-     ↓
-python scripts/load_ontology.py             ← write to Neo4j + PG
-     ↓
-Bump ONTOLOGY_VERSION in .env
-```
-
-### Candidate concept admission thresholds
-
-```yaml
-min_source_count:       3      # must appear in 3+ documents
-min_source_diversity:   0.6    # from 3+ distinct sites
-min_temporal_stability: 0.7    # present in 2+ crawl cycles
-min_structural_fit:     0.65   # can attach to a clear parent node
-min_composite_score:    0.65
-synonym_risk_max:       0.4    # must not be a simple synonym
-require_human_review:   true
-```
-
----
-
-## Pipeline
-
-The 6-stage pipeline converts a crawled document into indexed graph knowledge.
-Each stage is a `semcore.pipeline.base.Stage` implementation.
-
-```
-crawl_task
-    │
-    ▼ Stage 1 — Ingest (rules C1–C5)
-    │  robots check · rate limit · content_hash dedup
-    │  text extraction · doc_type detection
-    │
-    ▼ Stage 2 — Segment (rules S1–S4)    [switch routing: rfc / cli / default]
-    │  structural split: headings / tables / code blocks
-    │  semantic role classification: definition / config / fault / …
-    │  length control: 30–512 tokens; sliding window for oversized
-    │
-    ▼ Stage 3 — Align (rules A1–A5)
-    │  alias dictionary exact match
-    │  ontology node lookup → canonical tags + 5-layer tags
-    │  unmatched terms → evolution_candidates table
-    │
-    ▼ Stage 4 — Extract (rules R1–R4)
-    │  15 regex relation patterns → (subject, predicate, object)
-    │  predicate validation against controlled relation set
-    │  both endpoints must resolve to ontology nodes
-    │  confidence scoring (5 dimensions)
-    │
-    ▼ Stage 5 — Dedup (rules D1–D5)
-    │  segment dedup: SimHash hamming ≤ 3 + Jaccard > 0.85
-    │  fact dedup: exact SPO triple match → merge_cluster
-    │  conflict detection: same subject+predicate, different object
-    │
-    ▼ Stage 6 — Index (rules I1–I3)
-       gate: segment confidence ≥ 0.5, fact confidence ≥ 0.5
-       write PG (already done) → Neo4j nodes + edges
-       BAAI/bge-m3 embedding → segments.embedding + t_edu_detail vectors
-       mark document status = 'indexed'
-```
-
-### Run the pipeline
-
-```python
-from src.app_factory import get_app
-from semcore.core.context import PipelineContext
-
-app = get_app()
-
-ctx = PipelineContext(meta={"crawl_task_id": 1})
-app.ingest(ctx)
-```
-
----
-
-## Semantic API
+## 语义算子 API
 
 Base URL: `http://localhost:8000/api/v1/semantic`
 
-All requests go through the `OperatorRegistry` (with `TimingMiddleware` + `LoggingMiddleware`).
-All responses include a `meta` envelope:
+所有响应格式：`{"meta": {"ontology_version": "v0.2.0", "latency_ms": 12}, "result": {...}}`
 
-```json
-{
-  "meta": { "ontology_version": "v0.2.0", "latency_ms": 12 },
-  "result": { ... }
-}
-```
+### 查询与解析
 
-### Operator reference (15 operators)
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| GET | `/lookup` | 术语 → 本体节点 + 证据 |
+| GET | `/resolve` | 别名/厂商术语 → 标准节点 |
 
-#### Lookup & Resolution
+### 图遍历
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/lookup` | Resolve a term (alias/full name/Chinese) to its ontology node + optional evidence |
-| `GET` | `/resolve` | Map an alias or vendor term to the canonical node ID |
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| GET | `/expand` | 节点邻域展开（depth 1-3） |
+| GET | `/path` | 两节点间最短路径 |
+| GET | `/dependency_closure` | 依赖闭包 BFS |
 
-```bash
-curl "http://localhost:8000/api/v1/semantic/lookup?term=BGP&include_evidence=true"
-curl "http://localhost:8000/api/v1/semantic/resolve?alias=Border+Gateway+Protocol"
-curl "http://localhost:8000/api/v1/semantic/resolve?alias=Etherchannel&vendor=Cisco"
-```
+### 影响分析
 
-#### Graph Traversal
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| POST | `/impact_propagate` | 故障/变更影响链路推导 |
+| POST | `/filter` | 参数化对象过滤 + 分页 |
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/expand` | Expand a node's neighbourhood (depth 1–3, filter by relation types) |
-| `GET` | `/path` | Shortest semantic path between two ontology nodes |
-| `GET` | `/dependency_closure` | Full dependency tree via BFS (DEPENDS_ON + REQUIRES) |
+### 证据与治理
 
-```bash
-curl "http://localhost:8000/api/v1/semantic/expand?node_id=IP.EVPN&depth=2"
-curl "http://localhost:8000/api/v1/semantic/path?start_node_id=IP.EVPN_VXLAN&end_node_id=IP.BGP"
-curl "http://localhost:8000/api/v1/semantic/dependency_closure?node_id=IP.EVPN_VXLAN"
-```
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| GET | `/evidence_rank` | 事实证据排序 |
+| GET | `/conflict_detect` | 矛盾事实检测 |
+| POST | `/fact_merge` | 重复事实合并 |
 
-#### Impact & Filtering
+### 本体演化
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/impact_propagate` | BFS fault/change blast-radius from an event node |
-| `POST` | `/filter` | Parameterized filter over facts, segments, or concepts |
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| GET | `/candidate_discover` | 发现候选概念 |
+| GET | `/attach_score` | 候选词挂接评分 |
+| POST | `/evolution_gate` | 六项门控评审 |
 
-```bash
-curl -X POST "http://localhost:8000/api/v1/semantic/impact_propagate" \
-  -H "Content-Type: application/json" \
-  -d '{"event_node_id":"IP.BGP","event_type":"fault","max_depth":3}'
-```
+### 语义搜索（需 EMBEDDING_ENABLED=true）
 
-#### Evidence & Governance
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| POST | `/semantic_search` | 段落向量相似搜索 |
+| POST | `/edu_search` | 标题+内容双向量加权搜索 |
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/evidence_rank` | Rank evidence supporting a fact by quality |
-| `GET` | `/conflict_detect` | Find contradictory facts for a topic node |
-| `POST` | `/fact_merge` | Merge duplicate facts into one canonical fact |
-
-#### Ontology Evolution
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/candidate_discover` | Surface new candidate concepts from recent corpus |
-| `GET` | `/attach_score` | Score which parent node a candidate best fits |
-| `POST` | `/evolution_gate` | Check whether a candidate passes all 6 admission gates |
-
-```bash
-curl "http://localhost:8000/api/v1/semantic/candidate_discover?window_days=30&min_frequency=5"
-curl -X POST "http://localhost:8000/api/v1/semantic/evolution_gate" \
-  -H "Content-Type: application/json" \
-  -d '{"candidate_id":"<uuid>"}'
-```
-
-#### Semantic Search (requires `EMBEDDING_ENABLED=true`)
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/semantic_search` | ANN search over `segments.embedding` (pgvector); optional layer filter |
-| `POST` | `/edu_search` | Dual-vector search over `t_edu_detail` (title_vec + content_vec weighted) |
-
-```bash
-curl -X POST "http://localhost:8000/api/v1/semantic/semantic_search" \
-  -H "Content-Type: application/json" \
-  -d '{"query":"BGP route reflector configuration","top_k":5,"layer_filter":"mechanism"}'
-
-curl -X POST "http://localhost:8000/api/v1/semantic/edu_search" \
-  -H "Content-Type: application/json" \
-  -d '{"query":"OSPF area design","top_k":5,"title_weight":0.4}'
-```
-
-Full interactive documentation: **http://localhost:8000/docs**
+交互文档：**http://localhost:8000/docs**
 
 ---
 
-## Development Roadmap
+## 本体
 
-| Phase | Scope | Status |
-|---|---|---|
-| **Phase 1** | Ontology definition — 5-layer YAML, 54 relation types, 145 nodes | ✅ Complete |
-| **Phase 2** | Crawl pipeline — ingest → segment → align → extract → dedup → index | ✅ Complete |
-| **Phase 3** | Knowledge governance — multi-source merge, conflict resolution, confidence scoring | ✅ Complete |
-| **Phase 4** | Semantic operator API — 15 operators via OperatorRegistry | ✅ Complete |
-| **Phase 5** | Ontology evolution loop — discover → score → gate → publish | ✅ Complete |
-| **Phase 6** | semcore framework — abstract ABCs, middleware, conditional routing | ✅ Complete |
-| **Phase 7** | Embedding & semantic search — BAAI/bge-m3, pgvector, semantic_search + edu_search | ✅ Implemented (activation requires `EMBEDDING_ENABLED=true` + model download) |
-| **Phase 8** | Application integration — Q&A, config understanding, fault analysis | 🔜 Planned |
+本体定义在 `ontology/` YAML 文件中 —— 这是**唯一源头**，不要直接改 Neo4j。
 
-### Next steps (Phase 8 candidates)
+### 五层知识模型
 
-- [ ] Add site whitelist seeds for IETF RFC, Cisco Docs, Huawei iLearningX
-- [ ] Add Airflow/Prefect DAG for scheduled batch crawling
-- [ ] Enable LLM-assisted extraction for S/A-rank sources (`LLM_ENABLED=true`)
-- [ ] Download and activate `BAAI/bge-m3` model (`EMBEDDING_ENABLED=true`)
-- [ ] Add Q&A endpoint combining semantic_search + impact_propagate for fault diagnosis
-- [ ] Add domain-specific pipeline branches (RFC segmenter, CLI config parser)
+| 层 | Neo4j 标签 | 数量 | 示例 |
+|----|-----------|------|------|
+| concept | OntologyNode | 74 | IP.BGP, IP.OSPF, IP.EVPN |
+| mechanism | MechanismNode | 24 | MECH.LinkStateFlooding, MECH.ECMPSelection |
+| method | MethodNode | 22 | METHOD.AddressPlanningMethod |
+| condition | ConditionRuleNode | 20 | COND.SmallScaleApplicability |
+| scenario | ScenarioPatternNode | 13 | SCENE.DualExitCampusInternetScenario |
+
+### 修改流程
+
+```
+编辑 YAML → load_ontology.py --dry-run（校验）→ 人工审核 → load_ontology.py（写入）
+```
 
 ---
 
-## Design Documents
+## 知识来源等级
 
-Detailed design rationale is in `docs/`:
+| 等级 | 来源 | 置信权重 |
+|------|------|----------|
+| **S** | IETF, 3GPP, ITU-T, IEEE | 1.0 |
+| **A** | Cisco, Huawei, Juniper, Nokia | 0.85 |
+| **B** | 技术白皮书, 公开课程 | 0.65 |
+| **C** | 博客, 论坛, 问答社区 | 0.40 |
 
-| Document | Contents |
-|---|---|
-| `semcore-framework-design.md` | Framework design: 6 layers, middleware onion model, conditional routing |
-| `refactoring-plan.md` | Mapping of src/ to semcore ABCs; 26 new adapter files |
-| `architecture-decisions.md` | ADR log: embedding model selection, storage choices, LLM strategy |
-| `telecom-semantic-kb-system-design.md` | Full system design: storage selection, quality assurance, risk analysis |
-| `telecom-ontology-design.md` | Ontology design principles, 5-layer knowledge model, YAML node format |
-| `development-plan-detailed.md` | PostgreSQL DDL, Neo4j schema, complete pipeline rules (C1–I3), API specs |
+置信度公式：`0.30×source_authority + 0.20×extraction_method + 0.20×ontology_fit + 0.20×cross_source_consistency + 0.10×temporal_validity`
 
 ---
 
-## Source Trust Levels
+## 设计文档
 
-| Rank | Sources | Role in system |
-|---|---|---|
-| **S** | IETF, 3GPP, ITU-T, IEEE, ETSI, MEF, ONF | Primary facts, high confidence |
-| **A** | Cisco, Huawei, Juniper, Nokia, Arista, H3C | Secondary facts, vendor context |
-| **B** | Technical whitepapers, open courseware | Supporting evidence |
-| **C** | Blogs, forums, Q&A communities | Auxiliary evidence only |
-
-Confidence formula: `0.30×source_authority + 0.20×extraction_quality + 0.20×ontology_fit + 0.20×cross_source_consistency + 0.10×temporal_validity`
+| 文档 | 内容 |
+|------|------|
+| `docs/architecture-design-20260402.md` | 当前完整架构设计 |
+| `docs/development-spec-20260402.md` | 当前完整开发方案 |
+| `docs/architecture-decisions.md` | ADR 决策记录（ADR-001 ~ ADR-009） |
+| `docs/semcore-framework-design.md` | semcore 框架设计 |
+| `docs/telecom-ontology-design.md` | 本体设计原则 |
 
 ---
 
 ## License
 
-This project is for research and internal knowledge engineering purposes.
-All crawled content remains the property of its original authors.
-The system stores knowledge indexes and evidence references, not full-text reproductions.
+本项目用于研究和内部知识工程目的。所有爬取内容版权归原作者所有。系统存储知识索引和证据引用，不存储全文。
