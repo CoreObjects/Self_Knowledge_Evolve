@@ -44,6 +44,36 @@ class LLMProvider(ABC):
         the schema.
         """
 
+    # ── Pipeline-facing helpers (default implementations provided) ────────────
+    # Pipeline stages call these directly on app.llm.  Concrete providers
+    # should override them; the defaults give safe no-op / fallback behaviour.
+
+    def is_enabled(self) -> bool:
+        """Return True if the LLM backend is configured and ready.
+
+        Stages use this to decide whether to attempt LLM calls.
+        Default: always enabled — override in providers that need a key/flag.
+        """
+        return True
+
+    def generate_title(self, text: str) -> str | None:
+        """Generate a short title (<=255 chars) for a text fragment.
+
+        Return None to let the caller fall back to rule-based title extraction.
+        Default: None (disabled).
+        """
+        return None
+
+    def extract_rst_relations(
+        self,
+        edu_pairs: list[tuple[str, str, str, str]],
+    ) -> list[str]:
+        """Return one RST relation type string per (src_id, src_text, dst_id, dst_text) pair.
+
+        Default: 'Sequence' for every pair (safe structural fallback).
+        """
+        return ["Sequence"] * len(edu_pairs)
+
 
 # ---------------------------------------------------------------------------
 # Embeddings

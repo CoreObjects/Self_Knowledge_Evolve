@@ -71,8 +71,8 @@ class Settings(BaseSettings):
 
     # ── LLM (relation extraction) ─────────────────────────────
     LLM_API_KEY: str = ""
-    LLM_BASE_URL: str = "https://api.anthropic.com"
-    LLM_MODEL: str = "claude-haiku-4-5-20251001"
+    LLM_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai"
+    LLM_MODEL: str = "gemini-2.0-flash"
     LLM_MAX_TOKENS: int = 1024
     LLM_ENABLED: bool = False   # set True to enable LLM extraction
 

@@ -202,3 +202,25 @@ API 上传 → MinIO + documents(raw)        raw → extract → normalize → c
 - `src/pipeline/runner.py`：同上
 
 **文档状态流转**：`raw → cleaned → segmented → indexed`
+
+---
+
+## ADR-010 查询 API 尚未支持跨存储关联查询（遗留问题）
+
+**背景**：当前 15 个语义算子中，大多数只查单一存储：
+
+- 图遍历类（`expand`、`path`、`impact_propagate` 等）：纯 Neo4j
+- 治理类（`evidence_rank`、`conflict_detect`）：纯 PostgreSQL
+- 向量类（`semantic_search`、`edu_search`）：纯 PostgreSQL（pgvector）
+- MinIO：**没有任何查询算子读取 MinIO**，目前仅写入路径（crawler/pipeline）
+
+`expand` 虽然有 `include_segments=True` 参数，但它查的是 Neo4j 里的 `KnowledgeSegment` 节点（只有 segment_id + 元数据），不连接 PG 的 `segments` 表，无法返回 EDU 文本内容，也没有利用 PG 里存储的 RST 顺序关系。
+
+**缺口**：流程性知识（配置步骤、操作顺序）存储在 PG `segments` 表的 RST 关系字段中，但没有查询 API 能将"Neo4j 图节点 → PG EDU 序列 → MinIO 原始段落"串联起来。
+
+**待实现**：新增 `node_context` 算子，执行三层关联查询：
+1. **Neo4j**：`(KnowledgeSegment)-[:TAGGED_WITH]->(OntologyNode {node_id})` 取 segment_id 列表
+2. **PG**：按 segment_id 拉取 EDU 文本 + RST 关系 + sequence_order，重建顺序
+3. **MinIO**（可选）：按 source_doc_id 取 `cleaned/` 原文，提供上下文窗口
+
+**触发条件**：等有真实数据入库后，结合实际查询场景确认接口设计再实现。

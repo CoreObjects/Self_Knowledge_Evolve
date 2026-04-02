@@ -63,7 +63,6 @@ class AppConfig:
     graph:      GraphStore
     store:      RelationalStore
     objects:    ObjectStore
-    crawler_store: RelationalStore | None = None  # separate DB for crawler tables
 
     # ── Knowledge ─────────────────────────────────────────────────────────────
     ontology:   OntologyProvider
@@ -72,6 +71,9 @@ class AppConfig:
     confidence_scorer:  ConfidenceScorer
     conflict_detector:  ConflictDetector
     evolution_gate:     EvolutionGate
+
+    # ── Optional providers (have defaults — must come after required fields) ──
+    crawler_store: RelationalStore | None = None  # separate DB for crawler tables
 
     # ── Pipeline ──────────────────────────────────────────────────────────────
     # Supply Stage instances in execution order.  If you need branching, build

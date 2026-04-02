@@ -23,7 +23,9 @@ _rel_store: list[dict] = []           # minimal edge list (not used in dev)
 # ── Public seed API (called from seed.py) ────────────────────────────────────
 
 def seed_nodes(nodes: dict[str, dict]) -> None:
-    _nodes.update(nodes)
+    for node_id, node in nodes.items():
+        # YAML uses 'id'; Neo4j stores it as property 'node_id'. Expose both.
+        _nodes[node_id] = {**node, "node_id": node_id}
     logger.info("fake_neo4j: seeded %d OntologyNode records", len(nodes))
 
 

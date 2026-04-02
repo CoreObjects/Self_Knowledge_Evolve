@@ -151,19 +151,30 @@ def _to_sqlite(sql: str) -> str:
     sql = sql.replace("governance.", "")          # strip schema prefix (SQLite has no schemas)
     sql = re.sub(r"%s::\w+", "?", sql)           # strip PG type casts (%s::jsonb → ?)
     sql = re.sub(r"ARRAY\[%s\]", "%s", sql)      # ARRAY[%s] → %s (store as plain text)
+    # ANY(%s) → IN (SELECT value FROM json_each(?))
+    # Params are JSON-serialised lists; json_each unpacks them for IN-list matching.
+    sql = re.sub(r"=\s*ANY\(%s\)", "IN (SELECT value FROM json_each(?))", sql)
+    sql = re.sub(r"=\s*ANY\(\?\)", "IN (SELECT value FROM json_each(?))", sql)
     return sql.replace("%s", "?")
 
 
 def _normalise_params(params) -> tuple:
-    """Ensure params is a tuple (handles list or None)."""
+    """Ensure params is a tuple (handles list or None).
+
+    List/tuple values that are *elements* of the params sequence are
+    JSON-serialised so SQLite can store or unpack them:
+    - Array-field values (e.g. section_path=[]) → stored as JSON text.
+    - ANY(%s) list params → also JSON text; _to_sqlite rewrites the clause
+      to use json_each(?) so SQLite unpacks them for IN-list matching.
+    """
+    import json as _json
     if params is None:
         return ()
     if isinstance(params, (list, tuple)):
-        # Flatten single-element lists/tuples containing a list (e.g. ANY(%s) patterns)
         result = []
         for p in params:
             if isinstance(p, (list, tuple)):
-                result.extend(p)
+                result.append(_json.dumps(p))
             else:
                 result.append(p)
         return tuple(result)
