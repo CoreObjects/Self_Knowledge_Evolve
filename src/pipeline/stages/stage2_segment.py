@@ -380,13 +380,21 @@ class SegmentStage(Stage):
         )
 
     def _extract_title(self, seg: dict) -> str:
-        """Generate a title for the EDU: LLM if available, else section_title, else first sentence."""
-        llm_title = self.llm.generate_title(seg["raw_text"])
-        if llm_title:
-            return llm_title[:255]
+        """Generate a title for the EDU.
+
+        Priority: section_title → first sentence → LLM (only when no
+        section context and segment is long enough to justify an API call).
+        This conserves LLM quota for Stage 4 relation extraction.
+        """
         if seg.get("section_title"):
             return seg["section_title"][:255]
         first = seg["raw_text"].strip().split(".")[0].strip()
+        if first and len(first) > 10:
+            return first[:255]
+        # Only call LLM when there's no section context and first sentence is too short
+        llm_title = self.llm.generate_title(seg["raw_text"])
+        if llm_title:
+            return llm_title[:255]
         return (first or seg["raw_text"][:80])[:255]
 
     def _make_content_source(self, doc: dict) -> str:
@@ -406,24 +414,29 @@ class SegmentStage(Stage):
             for i in range(len(segments) - 1)
         ]
 
-        llm_enabled = self.llm.is_enabled()
-        if llm_enabled:
-            relation_types = self.llm.extract_rst_relations(pairs)
-        else:
-            relation_types = [
-                _RULE_RST.get(
-                    (segments[i].get("segment_type", ""), segments[i + 1].get("segment_type", "")),
-                    "Sequence",
-                )
-                for i in range(len(pairs))
-            ]
+        # LLM first, rule fallback — each relation tagged with its source
+        llm_types: list[str] | None = None
+        if self.llm.is_enabled():
+            llm_types = self.llm.extract_rst_relations(pairs)
+
+        rule_types = [
+            _RULE_RST.get(
+                (segments[i].get("segment_type", ""), segments[i + 1].get("segment_type", "")),
+                "Sequence",
+            )
+            for i in range(len(pairs))
+        ]
 
         rows = []
         for i, (src_id, _, dst_id, _) in enumerate(pairs):
-            rel_type = relation_types[i] if i < len(relation_types) else "Sequence"
+            if llm_types and i < len(llm_types) and llm_types[i] != "Sequence":
+                rel_type = llm_types[i]
+                source = "llm"
+            else:
+                rel_type = rule_types[i] if i < len(rule_types) else "Sequence"
+                source = "rule"
             src_type = segments[i].get("segment_type", "unknown")
             dst_type = segments[i + 1].get("segment_type", "unknown")
-            source = "llm" if llm_enabled else "rule"
             rows.append((
                 str(uuid.uuid4()),
                 rel_type,

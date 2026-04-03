@@ -291,8 +291,9 @@ class IndexStage(Stage):
         contents = [seg.get("normalized_text") or seg.get("raw_text", "") for seg in segments]
 
         # Fetch titles from segments (written by stage2)
+        # Cast text[] to uuid[] for PG type matching
         rows = store.fetchall(
-            "SELECT segment_id, title FROM segments WHERE segment_id = ANY(%s)",
+            "SELECT segment_id, title FROM segments WHERE segment_id = ANY(%s::uuid[])",
             (seg_ids,),
         )
         title_map = {str(r["segment_id"]): r.get("title") or "" for r in rows}

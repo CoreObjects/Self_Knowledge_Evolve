@@ -33,3 +33,4 @@ logs/
 .pytest_cache/
 .coverage
 htmlcov/
+failed_docs.json
