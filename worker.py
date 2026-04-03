@@ -26,52 +26,224 @@ _RETRY_BACKOFF_MINUTES = [5, 30, 120]  # delay before 1st, 2nd, 3rd retry
 
 
 _SEED_SOURCES: list[dict] = [
+    # ══════════════════════════════════════════════════════════════
+    # S-rank: Authoritative standards bodies
+    # ══════════════════════════════════════════════════════════════
     {
-        "site_key": "rfc-editor",
-        "site_name": "RFC Editor",
-        "home_url": "https://www.rfc-editor.org/",
+        "site_key": "ietf-datatracker",
+        "site_name": "IETF Datatracker",
+        "home_url": "https://datatracker.ietf.org/",
         "source_rank": "S",
-        "rate_limit_rps": 1.0,
+        "rate_limit_rps": 0.5,
         "seed_urls": [
-            "https://www.rfc-editor.org/rfc/rfc793.txt",
-            "https://www.rfc-editor.org/rfc/rfc8200.txt",
-            "https://www.rfc-editor.org/rfc/rfc1034.txt",
-            "https://www.rfc-editor.org/rfc/rfc7231.txt",
+            # ── Core routing ──
+            "https://datatracker.ietf.org/doc/html/rfc4271",   # BGP-4
+            "https://datatracker.ietf.org/doc/html/rfc4456",   # BGP Route Reflection
+            "https://datatracker.ietf.org/doc/html/rfc4760",   # MP-BGP
+            "https://datatracker.ietf.org/doc/html/rfc7938",   # BGP in Large-Scale DC
+            "https://datatracker.ietf.org/doc/html/rfc4364",   # BGP/MPLS IP VPN
+            "https://datatracker.ietf.org/doc/html/rfc4684",   # Constrained Route Distribution
+            "https://datatracker.ietf.org/doc/html/rfc5065",   # BGP Confederations
+            "https://datatracker.ietf.org/doc/html/rfc6811",   # BGP RPKI Validation
+            "https://datatracker.ietf.org/doc/html/rfc2328",   # OSPF v2
+            "https://datatracker.ietf.org/doc/html/rfc5340",   # OSPF v3
+            "https://datatracker.ietf.org/doc/html/rfc3630",   # OSPF-TE
+            "https://datatracker.ietf.org/doc/html/rfc5308",   # IS-IS for IPv4/IPv6
+            "https://datatracker.ietf.org/doc/html/rfc5305",   # IS-IS TE Extensions
+            # ── MPLS / SR ──
+            "https://datatracker.ietf.org/doc/html/rfc3031",   # MPLS Architecture
+            "https://datatracker.ietf.org/doc/html/rfc3032",   # MPLS Label Stack
+            "https://datatracker.ietf.org/doc/html/rfc3209",   # RSVP-TE
+            "https://datatracker.ietf.org/doc/html/rfc5036",   # LDP
+            "https://datatracker.ietf.org/doc/html/rfc8402",   # Segment Routing Architecture
+            "https://datatracker.ietf.org/doc/html/rfc8986",   # SRv6 Network Programming
+            "https://datatracker.ietf.org/doc/html/rfc9252",   # BGP Overlay SR
+            # ── EVPN / VXLAN / Overlay ──
+            "https://datatracker.ietf.org/doc/html/rfc7432",   # BGP MPLS EVPN
+            "https://datatracker.ietf.org/doc/html/rfc7348",   # VXLAN
+            "https://datatracker.ietf.org/doc/html/rfc8365",   # EVPN Overlay Framework
+            "https://datatracker.ietf.org/doc/html/rfc9136",   # IP Prefix EVPN
+            # ── L2 / Switching ──
+            "https://datatracker.ietf.org/doc/html/rfc5765",   # STP MIB
+            "https://datatracker.ietf.org/doc/html/rfc7130",   # BFD on LAG
+            "https://datatracker.ietf.org/doc/html/rfc8668",   # LLDP YANG
+            # ── IP fundamentals ──
+            "https://datatracker.ietf.org/doc/html/rfc791",    # IPv4
+            "https://datatracker.ietf.org/doc/html/rfc8200",   # IPv6
+            "https://datatracker.ietf.org/doc/html/rfc793",    # TCP
+            "https://datatracker.ietf.org/doc/html/rfc768",    # UDP
+            "https://datatracker.ietf.org/doc/html/rfc2131",   # DHCP
+            "https://datatracker.ietf.org/doc/html/rfc1034",   # DNS Concepts
+            "https://datatracker.ietf.org/doc/html/rfc792",    # ICMP
+            "https://datatracker.ietf.org/doc/html/rfc4443",   # ICMPv6
+            # ── Redundancy / HA ──
+            "https://datatracker.ietf.org/doc/html/rfc3768",   # VRRP
+            "https://datatracker.ietf.org/doc/html/rfc5798",   # VRRPv3
+            "https://datatracker.ietf.org/doc/html/rfc5880",   # BFD
+            "https://datatracker.ietf.org/doc/html/rfc5881",   # BFD for IPv4/IPv6
+            # ── QoS / Security ──
+            "https://datatracker.ietf.org/doc/html/rfc2474",   # DiffServ
+            "https://datatracker.ietf.org/doc/html/rfc2475",   # DiffServ Architecture
+            "https://datatracker.ietf.org/doc/html/rfc2697",   # srTCM
+            "https://datatracker.ietf.org/doc/html/rfc2698",   # trTCM
+            "https://datatracker.ietf.org/doc/html/rfc2544",   # Benchmarking
+            "https://datatracker.ietf.org/doc/html/rfc4303",   # IPsec ESP
+            "https://datatracker.ietf.org/doc/html/rfc7296",   # IKEv2
+            # ── Network management ──
+            "https://datatracker.ietf.org/doc/html/rfc6241",   # NETCONF
+            "https://datatracker.ietf.org/doc/html/rfc8040",   # RESTCONF
+            "https://datatracker.ietf.org/doc/html/rfc7950",   # YANG
+            "https://datatracker.ietf.org/doc/html/rfc8345",   # Network Topology YANG
+            # ── NAT / Multicast ──
+            "https://datatracker.ietf.org/doc/html/rfc3022",   # Traditional NAT
+            "https://datatracker.ietf.org/doc/html/rfc6146",   # NAT64
+            "https://datatracker.ietf.org/doc/html/rfc4601",   # PIM-SM
+            "https://datatracker.ietf.org/doc/html/rfc3376",   # IGMPv3
         ],
-        "scope_rules": {
-            "allow": [r"^https?://www\.rfc-editor\.org/rfc/"],
-            "deny": [],
-        },
+        "scope_rules": None,
+        "extra_headers": None,
+    },
+    # ══════════════════════════════════════════════════════════════
+    # A-rank: Major vendor documentation
+    # ══════════════════════════════════════════════════════════════
+    {
+        "site_key": "huawei-info",
+        "site_name": "Huawei Info Center",
+        "home_url": "https://info.support.huawei.com/",
+        "source_rank": "A",
+        "rate_limit_rps": 0.3,
+        "seed_urls": [
+            "https://info.support.huawei.com/info-finder/encyclopedia/en/BGP.html",
+            "https://info.support.huawei.com/info-finder/encyclopedia/en/OSPF.html",
+            "https://info.support.huawei.com/info-finder/encyclopedia/en/MPLS.html",
+            "https://info.support.huawei.com/info-finder/encyclopedia/en/VXLAN.html",
+            "https://info.support.huawei.com/info-finder/encyclopedia/en/EVPN.html",
+            "https://info.support.huawei.com/info-finder/encyclopedia/en/SRv6.html",
+            "https://info.support.huawei.com/info-finder/encyclopedia/en/QoS.html",
+            "https://info.support.huawei.com/info-finder/encyclopedia/en/ACL.html",
+            "https://info.support.huawei.com/info-finder/encyclopedia/en/VLAN.html",
+            "https://info.support.huawei.com/info-finder/encyclopedia/en/NAT.html",
+            "https://info.support.huawei.com/info-finder/encyclopedia/en/DHCP.html",
+            "https://info.support.huawei.com/info-finder/encyclopedia/en/DNS.html",
+            "https://info.support.huawei.com/info-finder/encyclopedia/en/IPsec.html",
+            "https://info.support.huawei.com/info-finder/encyclopedia/en/BFD.html",
+            "https://info.support.huawei.com/info-finder/encyclopedia/en/VRRP.html",
+            "https://info.support.huawei.com/info-finder/encyclopedia/en/IS-IS.html",
+            "https://info.support.huawei.com/info-finder/encyclopedia/en/NETCONF.html",
+            "https://info.support.huawei.com/info-finder/encyclopedia/en/Segment+Routing.html",
+            "https://info.support.huawei.com/info-finder/encyclopedia/en/LACP.html",
+            "https://info.support.huawei.com/info-finder/encyclopedia/en/STP.html",
+        ],
+        "scope_rules": None,
         "extra_headers": None,
     },
     {
-        "site_key": "3gpp",
-        "site_name": "3GPP",
-        "home_url": "https://www.3gpp.org/",
-        "source_rank": "S",
-        "rate_limit_rps": 1.0,
+        "site_key": "juniper-techlib",
+        "site_name": "Juniper TechLibrary",
+        "home_url": "https://www.juniper.net/documentation/",
+        "source_rank": "A",
+        "rate_limit_rps": 0.3,
         "seed_urls": [
-            "https://portal.3gpp.org/desktopmodules/Specifications/SpecificationDetails.aspx?specificationId=3144"
+            "https://www.juniper.net/documentation/us/en/software/junos/bgp/topics/topic-map/bgp-overview.html",
+            "https://www.juniper.net/documentation/us/en/software/junos/ospf/topics/topic-map/ospf-overview.html",
+            "https://www.juniper.net/documentation/us/en/software/junos/mpls/topics/topic-map/mpls-overview.html",
+            "https://www.juniper.net/documentation/us/en/software/junos/evpn-vxlan/topics/concept/evpn-vxlan-overview.html",
+            "https://www.juniper.net/documentation/us/en/software/junos/is-is/topics/topic-map/is-is-overview.html",
+            "https://www.juniper.net/documentation/us/en/software/junos/segment-routing/topics/concept/segment-routing-overview.html",
+            "https://www.juniper.net/documentation/us/en/software/junos/high-availability/topics/topic-map/bfd.html",
+            "https://www.juniper.net/documentation/us/en/software/junos/nat/topics/topic-map/nat-overview.html",
         ],
-        "scope_rules": {
-            "allow": [r"^https?://portal\.3gpp\.org/"],
-            "deny": [],
-        },
+        "scope_rules": None,
         "extra_headers": None,
     },
     {
-        "site_key": "itu-t",
-        "site_name": "ITU-T Recommendations",
-        "home_url": "https://www.itu.int/en/ITU-T/publications/pages/recs.aspx",
-        "source_rank": "S",
-        "rate_limit_rps": 1.0,
+        "site_key": "arista-docs",
+        "site_name": "Arista Documentation",
+        "home_url": "https://www.arista.com/en/um-eos/",
+        "source_rank": "A",
+        "rate_limit_rps": 0.3,
         "seed_urls": [
-            "https://www.itu.int/net/ITU-T/lists/standards.aspx"
+            "https://www.arista.com/en/um-eos/eos-border-gateway-protocol-bgp",
+            "https://www.arista.com/en/um-eos/eos-open-shortest-path-first-version-3-ospfv3",
+            "https://www.arista.com/en/um-eos/eos-vxlan",
+            "https://www.arista.com/en/um-eos/eos-evpn-overview",
+            "https://www.arista.com/en/um-eos/eos-multi-protocol-label-switching-mpls-overview",
+            "https://www.arista.com/en/um-eos/eos-segment-routing",
         ],
-        "scope_rules": {
-            "allow": [r"^https?://www\.itu\.int/"],
-            "deny": [],
-        },
+        "scope_rules": None,
+        "extra_headers": None,
+    },
+    # ══════════════════════════════════════════════════════════════
+    # B-rank: Technical learning / whitepapers
+    # ══════════════════════════════════════════════════════════════
+    {
+        "site_key": "networklessons",
+        "site_name": "NetworkLessons",
+        "home_url": "https://networklessons.com/",
+        "source_rank": "B",
+        "rate_limit_rps": 0.3,
+        "seed_urls": [
+            "https://networklessons.com/cisco/ccnp-encor-350-401/introduction-to-bgp",
+            "https://networklessons.com/cisco/ccnp-encor-350-401/introduction-to-ospf",
+            "https://networklessons.com/cisco/ccnp-encor-350-401/introduction-to-mpls",
+            "https://networklessons.com/cisco/ccnp-encor-350-401/introduction-to-vxlan",
+            "https://networklessons.com/cisco/ccnp-encor-350-401/introduction-to-qos",
+            "https://networklessons.com/cisco/ccnp-encor-350-401/introduction-to-is-is",
+            "https://networklessons.com/cisco/ccnp-encor-350-401/introduction-to-sd-wan",
+            "https://networklessons.com/cisco/ccnp-encor-350-401/introduction-to-vrf-lite",
+        ],
+        "scope_rules": None,
+        "extra_headers": None,
+    },
+    {
+        "site_key": "cloudflare-learn",
+        "site_name": "Cloudflare Learning Center",
+        "home_url": "https://www.cloudflare.com/learning/",
+        "source_rank": "B",
+        "rate_limit_rps": 0.3,
+        "seed_urls": [
+            "https://www.cloudflare.com/learning/network-layer/what-is-bgp/",
+            "https://www.cloudflare.com/learning/network-layer/what-is-routing/",
+            "https://www.cloudflare.com/learning/network-layer/what-is-a-router/",
+            "https://www.cloudflare.com/learning/network-layer/what-is-an-autonomous-system/",
+            "https://www.cloudflare.com/learning/network-layer/what-is-mpls/",
+            "https://www.cloudflare.com/learning/security/glossary/what-is-bgp-hijacking/",
+            "https://www.cloudflare.com/learning/ddos/glossary/open-systems-interconnection-model-osi/",
+            "https://www.cloudflare.com/learning/network-layer/what-is-a-wan/",
+            "https://www.cloudflare.com/learning/network-layer/what-is-a-lan/",
+            "https://www.cloudflare.com/learning/network-layer/what-is-a-subnet/",
+        ],
+        "scope_rules": None,
+        "extra_headers": None,
+    },
+    {
+        "site_key": "packetlife",
+        "site_name": "PacketLife.net",
+        "home_url": "https://packetlife.net/",
+        "source_rank": "B",
+        "rate_limit_rps": 0.3,
+        "seed_urls": [
+            "https://packetlife.net/blog/2008/sep/22/ospf-area-types/",
+            "https://packetlife.net/blog/2009/jun/10/understanding-bgp-path-selection/",
+            "https://packetlife.net/blog/2010/jan/19/mpls-fundamentals/",
+            "https://packetlife.net/blog/2010/feb/1/vlan-trunking/",
+        ],
+        "scope_rules": None,
+        "extra_headers": None,
+    },
+    {
+        "site_key": "ipspace",
+        "site_name": "ipSpace.net Blog",
+        "home_url": "https://blog.ipspace.net/",
+        "source_rank": "B",
+        "rate_limit_rps": 0.3,
+        "seed_urls": [
+            "https://blog.ipspace.net/2024/01/bgp-labs-simple-routing-policy.html",
+            "https://blog.ipspace.net/2022/09/evpn-bridging-routing.html",
+            "https://blog.ipspace.net/2023/03/segment-routing-overview.html",
+            "https://blog.ipspace.net/2022/03/vxlan-evpn-behind-curtain.html",
+        ],
+        "scope_rules": None,
         "extra_headers": None,
     },
 ]
