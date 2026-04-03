@@ -4,7 +4,14 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 import time
+from pathlib import Path
+
+# Ensure semcore is importable
+_semcore_path = str(Path(__file__).parent / "semcore")
+if _semcore_path not in sys.path:
+    sys.path.insert(0, _semcore_path)
 
 from semcore.core.context import PipelineContext
 
