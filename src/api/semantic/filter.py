@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from semcore.providers.base import GraphStore, RelationalStore
 
+import logging
+
+log = logging.getLogger(__name__)
+
 
 def filter_objects(
     object_type: str,
@@ -16,6 +20,7 @@ def filter_objects(
     store: RelationalStore,
     graph: GraphStore,
 ) -> dict:
+    log.debug("filter type=%s filters=%s sort=%s page=%d", object_type, filters, sort_by, page)
     page_size = min(page_size, 100)
     offset = (page - 1) * page_size
 

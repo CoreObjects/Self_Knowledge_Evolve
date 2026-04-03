@@ -8,6 +8,10 @@ from typing import Any, Generator
 from semcore.providers.base import RelationalStore
 import src.db.crawler_postgres as cpg
 
+import logging
+
+log = logging.getLogger(__name__)
+
 
 class CrawlerPostgresRelationalStore(RelationalStore):
     def fetchone(self, sql: str, params: tuple | dict | None = None) -> dict[str, Any] | None:

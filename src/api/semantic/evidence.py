@@ -6,6 +6,10 @@ import uuid
 
 from semcore.providers.base import RelationalStore
 
+import logging
+
+log = logging.getLogger(__name__)
+
 
 def evidence_rank(
     fact_id: str,
@@ -14,6 +18,7 @@ def evidence_rank(
     *,
     store: RelationalStore,
 ) -> dict:
+    log.debug("evidence_rank fact=%s rank_by=%s", fact_id, rank_by)
     _allowed = {"evidence_score", "source_rank", "created_at"}
     safe_col = rank_by if rank_by in _allowed else "evidence_score"
 
@@ -30,6 +35,7 @@ def evidence_rank(
         """,
         (fact_id, max_results),
     )
+    log.info("evidence_rank fact=%s: %d records", fact_id, len(rows))
     return {"fact_id": fact_id, "evidence": rows, "count": len(rows)}
 
 

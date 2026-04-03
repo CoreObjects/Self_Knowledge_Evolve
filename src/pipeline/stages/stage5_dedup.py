@@ -40,6 +40,7 @@ class DedupStage(Stage):
             "WHERE source_doc_id=%s AND lifecycle_state='active' ORDER BY segment_index",
             (source_doc_id,),
         )
+        log.debug("Dedup segments: doc=%s active_segments=%d", source_doc_id, len(segments))
         superseded = 0
         n = len(segments)
 
@@ -59,9 +60,10 @@ class DedupStage(Stage):
                             "UPDATE segments SET lifecycle_state='superseded' WHERE segment_id=%s",
                             (b["segment_id"],),
                         )
+                        log.debug("  superseded seg=%s (hamming=%d)", str(b["segment_id"])[:12], hd)
                         superseded += 1
 
-        log.info("Doc %s: %d segments superseded by SimHash dedup", source_doc_id, superseded)
+        log.info("Dedup doc=%s: %d/%d segments superseded", source_doc_id, superseded, n)
         return {"segments_superseded": superseded}
 
     def process_facts(self, source_doc_id: str) -> dict:
@@ -78,6 +80,7 @@ class DedupStage(Stage):
             (source_doc_id,),
         )
 
+        log.debug("Dedup facts: doc=%s active_facts=%d", source_doc_id, len(new_facts))
         merged = 0
         conflicted = 0
 

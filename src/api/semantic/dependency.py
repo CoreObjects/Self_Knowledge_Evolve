@@ -6,6 +6,10 @@ from collections import deque
 
 from semcore.providers.base import GraphStore
 
+import logging
+
+log = logging.getLogger(__name__)
+
 DEFAULT_RELATION_TYPES = ["DEPENDS_ON", "REQUIRES"]
 
 
@@ -17,6 +21,7 @@ def dependency_closure(
     *,
     graph: GraphStore,
 ) -> dict:
+    log.debug("dependency_closure node=%s depth=%d rel=%s", node_id, max_depth, relation_types)
     rel_types = relation_types or DEFAULT_RELATION_TYPES
     max_depth = min(max_depth, 10)
     rel_filter = "|".join(rel_types)
@@ -50,3 +55,4 @@ def dependency_closure(
         "max_depth":   max_depth,
         "relation_types": rel_types,
     }
+    log.info("dependency_closure node=%s: %d nodes in closure", node_id, len(visited))

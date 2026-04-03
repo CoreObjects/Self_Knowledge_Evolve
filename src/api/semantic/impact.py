@@ -6,6 +6,10 @@ from collections import deque
 
 from semcore.providers.base import GraphStore
 
+import logging
+
+log = logging.getLogger(__name__)
+
 _POLICY_RELATIONS = {
     "causal":  ["CAUSES", "IMPACTS"],
     "service": ["IMPACTS", "DEPENDS_ON"],
@@ -29,6 +33,7 @@ def impact_propagate(
     *,
     graph: GraphStore,
 ) -> dict:
+    log.debug("impact_propagate node=%s type=%s policy=%s depth=%d", event_node_id, event_type, relation_policy, max_depth)
     rel_types = _POLICY_RELATIONS.get(relation_policy, _POLICY_RELATIONS["all"])
     impact_type = _IMPACT_TYPE.get(event_type, "affected")
     max_depth = min(max_depth, 6)
@@ -80,6 +85,7 @@ def impact_propagate(
 
     impact_tree.sort(key=lambda x: (x["depth"], -x["confidence"]))
 
+    log.info("impact_propagate node=%s: %d nodes impacted (max_depth=%d)", event_node_id, len(impact_tree), max_depth)
     return {
         "event":          {"node_id": event_node_id, "event_type": event_type},
         "relation_policy": relation_policy,

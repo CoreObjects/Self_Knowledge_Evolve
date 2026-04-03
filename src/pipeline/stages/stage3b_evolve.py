@@ -78,6 +78,7 @@ class EvolveStage(Stage):
         ontology,
     ) -> int:
         """Score candidates that were seen in this document's processing."""
+        log.debug("Scoring candidates for doc=%s", source_doc_id)
         # Only score candidates touched by this doc (recently upserted)
         candidates = store.fetchall(
             """
@@ -89,8 +90,10 @@ class EvolveStage(Stage):
             (source_doc_id,),
         )
         if not candidates:
+            log.debug("No scorable candidates for doc=%s", source_doc_id)
             return 0
 
+        log.info("Scoring %d candidates for doc=%s", len(candidates), source_doc_id)
         policy = _load_policy()
         weights = policy.get("scoring_weights", {})
 
@@ -152,6 +155,13 @@ class EvolveStage(Stage):
                 - w.get("synonym_risk_penalty", 0.05) * synonym_risk
             )
             composite = round(max(0.0, min(1.0, composite)), 4)
+
+            log.debug(
+                "  candidate=%s form=%s diversity=%.2f stability=%.2f fit=%.2f "
+                "synonym_risk=%.2f composite=%.4f parent=%s",
+                str(cid)[:12], normalized, source_diversity, temporal_stability,
+                structural_fit, synonym_risk, composite, best_parent,
+            )
 
             # Persist scores
             store.execute(

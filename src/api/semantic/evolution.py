@@ -8,6 +8,10 @@ import yaml
 
 from semcore.providers.base import GraphStore, RelationalStore
 
+import logging
+
+log = logging.getLogger(__name__)
+
 _POLICY_PATH = Path("ontology/governance/evolution_policy.yaml")
 
 
@@ -25,6 +29,7 @@ def candidate_discover(
     *,
     store: RelationalStore,
 ) -> dict:
+    log.debug("candidate_discover window=%d min_freq=%d min_src=%d", window_days, min_frequency, min_source_count)
     rows = store.fetchall(
         """
         SELECT normalized_form, COUNT(*) AS freq, MAX(last_seen_at) AS latest,

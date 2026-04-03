@@ -74,6 +74,9 @@ class ExtractStage(Stage):
                 t["ontology_node_id"] for t in tags if t.get("ontology_node_id")
             ]
 
+        log.info("Extract start doc=%s: segments=%d rank=%s llm=%s",
+                 source_doc_id, len(segments), source_rank,
+                 "enabled" if self._llm.is_enabled() else "disabled")
         all_facts: list[dict] = []
         llm_count = 0
         rule_count = 0
@@ -84,11 +87,17 @@ class ExtractStage(Stage):
             if llm_facts:
                 all_facts.extend(llm_facts)
                 llm_count += len(llm_facts)
+                log.debug("  seg=%s llm=%d nodes=%d",
+                          str(seg["segment_id"])[:12], len(llm_facts),
+                          len(seg.get("canonical_nodes") or []))
             else:
                 # LLM unavailable or returned nothing → fall back to rule-based
                 rule_facts = self.extract_facts(seg, source_rank)
                 all_facts.extend(rule_facts)
                 rule_count += len(rule_facts)
+                log.debug("  seg=%s rule=%d nodes=%d",
+                          str(seg["segment_id"])[:12], len(rule_facts),
+                          len(seg.get("canonical_nodes") or []))
 
         self._save_facts(all_facts, source_doc_id)
         self._crawler_store.execute(

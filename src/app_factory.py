@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import logging
+
 from semcore.app import AppConfig, SemanticApp
 from semcore.operators.base import LoggingMiddleware, TimingMiddleware
+
+log = logging.getLogger(__name__)
 
 
 def build_app() -> SemanticApp:
@@ -40,7 +44,10 @@ def build_app() -> SemanticApp:
     from src.operators import ALL_OPERATORS
 
     # ── Assembly ──────────────────────────────────────────────────────────────
+    log.info("Building SemanticApp...")
     registry = OntologyRegistry.from_default()
+    log.info("  OntologyRegistry: %d nodes, %d aliases, %d relations",
+             len(registry.nodes), len(registry.alias_map), len(registry.relation_ids))
 
     config = AppConfig(
         llm       = ClaudeLLMProvider(settings),
@@ -57,6 +64,8 @@ def build_app() -> SemanticApp:
         middlewares = [TimingMiddleware(), LoggingMiddleware()],
     )
     config.pipeline = build_pipeline()
+    log.info("  SemanticApp assembled: %d operators, %d pipeline stages",
+             len(ALL_OPERATORS), len(config.pipeline.stage_names()) if config.pipeline else 0)
     return SemanticApp(config)
 
 

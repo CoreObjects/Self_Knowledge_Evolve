@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any, TYPE_CHECKING
 
 from semcore.providers.base import LLMProvider
+
+log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from src.config.settings import Settings

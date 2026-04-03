@@ -59,16 +59,23 @@ class AlignStage(Stage):
             "SELECT * FROM segments WHERE source_doc_id=%s AND lifecycle_state='active'",
             (source_doc_id,),
         )
+        log.info("Align start doc=%s segments=%d", source_doc_id, len(segments))
         total_tags = 0
         pending = 0
         candidate_terms = 0
 
         for seg in segments:
             tags, candidates = self.align_segment(seg)
-            total_tags += self._save_tags(seg["segment_id"], tags)
+            saved = self._save_tags(seg["segment_id"], tags)
+            total_tags += saved
             candidate_terms += candidates
-
             canonical_count = sum(1 for t in tags if t["tag_type"] == "canonical")
+            log.debug(
+                "  seg=%s type=%s tags=%d canonical=%d candidates=%d",
+                str(seg["segment_id"])[:12], seg.get("segment_type", "?"),
+                saved, canonical_count, candidates,
+            )
+
             if canonical_count == 0:
                 store.execute(
                     "UPDATE segments SET lifecycle_state='pending_alignment' WHERE segment_id=%s",

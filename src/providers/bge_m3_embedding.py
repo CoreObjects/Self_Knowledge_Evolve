@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import logging
+
 from semcore.providers.base import EmbeddingProvider
 from src.utils import embedding as _emb
+
+log = logging.getLogger(__name__)
 
 
 class BGEM3EmbeddingProvider(EmbeddingProvider):

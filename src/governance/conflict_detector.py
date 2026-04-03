@@ -6,10 +6,15 @@ from semcore.core.types import Fact
 from semcore.governance.base import Conflict, ConflictDetector
 from semcore.providers.base import RelationalStore
 
+import logging
+
+log = logging.getLogger(__name__)
+
 
 class TelecomConflictDetector(ConflictDetector):
     def detect(self, fact: Fact, store: RelationalStore) -> list[Conflict]:
         """Find existing facts with same subject+predicate but different object."""
+        log.debug("conflict_detect: %s %s %s", fact.subject, fact.predicate, fact.object)
         rows = store.fetchall(
             """
             SELECT fact_id FROM facts
@@ -18,7 +23,7 @@ class TelecomConflictDetector(ConflictDetector):
             """,
             (fact.subject, fact.predicate, fact.object),
         )
-        return [
+        conflicts = [
             Conflict(
                 fact_id_a=fact.fact_id,
                 fact_id_b=row["fact_id"],
@@ -29,3 +34,6 @@ class TelecomConflictDetector(ConflictDetector):
             )
             for row in rows
         ]
+        if conflicts:
+            log.info("conflict_detect: %s %s → %d conflicts", fact.subject, fact.predicate, len(conflicts))
+        return conflicts

@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from semcore.providers.base import GraphStore
 
+import logging
+
+log = logging.getLogger(__name__)
+
 _RELATION_POLICIES = {
     "dependency": ["DEPENDS_ON", "REQUIRES"],
     "causal":     ["CAUSES", "IMPACTS"],
@@ -20,6 +24,7 @@ def path_infer(
     *,
     graph: GraphStore,
 ) -> dict:
+    log.debug("path %s → %s (hops=%d policy=%s)", start_node_id, end_node_id, max_hops, relation_policy)
     max_hops = min(max(max_hops, 1), 8)
     rel_types = _RELATION_POLICIES.get(relation_policy, [])
 
@@ -61,6 +66,7 @@ def path_infer(
         path_confidence = min(rel_confs) if rel_confs else 1.0
         paths.append({"hops": hops, "path": path_steps, "path_confidence": path_confidence})
 
+    log.info("path %s → %s: %d paths found", start_node_id, end_node_id, len(paths))
     return {
         "start_node_id":    start_node_id,
         "end_node_id":      end_node_id,

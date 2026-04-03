@@ -127,6 +127,7 @@ class Spider:
 
     def run_pending_tasks(self, limit: int = 10) -> list[dict]:
         """Fetch pending crawl_tasks from DB and process each."""
+        log.debug("Polling pending crawl tasks (limit=%d)", limit)
         tasks = self._store.fetchall(
             """
             SELECT ct.id, ct.url, ct.site_key, ct.priority, ct.task_type,

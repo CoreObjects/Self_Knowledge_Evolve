@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import logging
+
 from semcore.core.types import KnowledgeLayer, OntologyNode, RelationDef
 from semcore.ontology.base import OntologyProvider
 from src.ontology.registry import OntologyRegistry
+
+log = logging.getLogger(__name__)
 
 
 def _node_from_dict(d: dict) -> OntologyNode:

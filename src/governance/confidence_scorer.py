@@ -8,9 +8,16 @@ from semcore.core.types import ConfidenceScore, Fact
 from semcore.governance.base import ConfidenceScorer
 from src.utils import confidence as _conf
 
+import logging
+
+log = logging.getLogger(__name__)
+
 
 class TelecomConfidenceScorer(ConfidenceScorer):
     def score(self, fact: Fact, context: dict[str, Any]) -> ConfidenceScore:
+        log.debug("scoring fact=%s rank=%s method=%s",
+                  fact.fact_id[:12] if fact.fact_id else "?",
+                  context.get("source_rank", "C"), context.get("extraction_method", "rule"))
         source_rank        = context.get("source_rank", "C")
         extraction_method  = context.get("extraction_method", "rule")
         ontology_fit       = float(context.get("ontology_fit", 0.8))

@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from semcore.providers.base import GraphStore
 
+import logging
+
+log = logging.getLogger(__name__)
+
 
 def expand(
     node_id: str,
@@ -15,6 +19,7 @@ def expand(
     *,
     graph: GraphStore,
 ) -> dict:
+    log.debug("expand node=%s depth=%d rel_types=%s", node_id, depth, relation_types)
     depth = min(max(depth, 1), 3)
 
     # Validate node exists
@@ -77,4 +82,8 @@ def expand(
         """
         result["segments"] = [dict(r) for r in graph.read(seg_cypher, node_id=node_id)]
 
+    log.info("expand node=%s: %d neighbours, facts=%s, segments=%s",
+             node_id, len(neighbors),
+             len(result.get("facts", [])) if include_facts else "n/a",
+             len(result.get("segments", [])) if include_segments else "n/a")
     return result

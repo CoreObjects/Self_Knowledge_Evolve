@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import logging
+
 from semcore.providers.base import GraphStore, RelationalStore
 from src.utils.text import normalize_text
+
+log = logging.getLogger(__name__)
 
 
 def lookup(
@@ -18,6 +22,7 @@ def lookup(
     graph: GraphStore,
 ) -> dict:
     """Resolve a term to its ontology node(s)."""
+    log.debug("lookup term=%r scope=%r lang=%s", term, scope, lang)
     term_lower = normalize_text(term)
 
     # 1. Exact match on canonical_name
@@ -32,11 +37,14 @@ def lookup(
         node, match_type = _pg_alias_match(term_lower, scope, store, graph)
 
     if not node:
+        log.info("lookup no match: term=%r", term)
         return {"matched_node": None, "match_type": "not_found", "input_surface_form": term}
 
+    log.info("lookup matched: term=%r → %s (%s)", term, node.get("node_id"), match_type)
     evidence = []
     if include_evidence:
         evidence = _fetch_evidence(node["node_id"], max_evidence, store)
+        log.debug("lookup evidence: %d items for %s", len(evidence), node.get("node_id"))
 
     return {
         "matched_node":      node,

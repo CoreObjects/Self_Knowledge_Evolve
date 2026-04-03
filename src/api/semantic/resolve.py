@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import logging
+
 from semcore.providers.base import GraphStore, RelationalStore
 from src.utils.text import normalize_text
+
+log = logging.getLogger(__name__)
 
 
 def resolve(
@@ -14,6 +18,7 @@ def resolve(
     store: RelationalStore,
     graph: GraphStore,
 ) -> dict:
+    log.debug("resolve alias=%r vendor=%r", alias, vendor)
     alias_lower = normalize_text(alias)
 
     sql = "SELECT * FROM lexicon_aliases WHERE lower(surface_form) = %s"
@@ -25,6 +30,7 @@ def resolve(
     rows = store.fetchall(sql, tuple(params))
 
     if not rows:
+        log.info("resolve no match: alias=%r", alias)
         return {"input": alias, "resolved": None, "alternatives": []}
 
     primary = rows[0]
@@ -36,6 +42,8 @@ def resolve(
         id=primary["canonical_node_id"],
     )
     canonical_name = node_row[0]["name"] if node_row else primary["canonical_node_id"]
+    log.info("resolve matched: alias=%r → %s (conf=%.2f, alternatives=%d)",
+             alias, primary["canonical_node_id"], float(primary["confidence"]), len(alternatives))
 
     return {
         "input": alias,

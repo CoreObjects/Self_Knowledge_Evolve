@@ -82,12 +82,22 @@ class IndexStage(Stage):
             (source_doc_id, list(_LAYER_TAG_TYPES)),
         )
 
+        log.info(
+            "Index start doc=%s: segments=%d facts=%d evidence=%d tags=%d",
+            source_doc_id, len(segments), len(facts), len(evidence), len(seg_tags),
+        )
+
         # Rule I2: write order — PG already done, now Neo4j
         self._index_document(doc)
+        log.debug("  indexed document node")
         stats["segments_indexed"] = self._index_segments(segments)
+        log.debug("  indexed %d segment nodes", stats["segments_indexed"])
         stats["facts_indexed"]    = self._index_facts(facts)
+        log.debug("  indexed %d fact nodes + RELATED_TO edges", stats["facts_indexed"])
         stats["evidence_indexed"] = self._index_evidence(evidence, facts)
+        log.debug("  indexed %d evidence nodes", stats["evidence_indexed"])
         self._index_tags(seg_tags)
+        log.debug("  indexed %d TAGGED_WITH edges", len(seg_tags))
         self._write_embeddings(segments)
         self._write_edu_embeddings(segments)
 
@@ -95,7 +105,9 @@ class IndexStage(Stage):
         store.execute(
             "UPDATE documents SET status='indexed' WHERE source_doc_id=%s", (source_doc_id,)
         )
-        log.info("Indexed doc %s → %s", source_doc_id, stats)
+        log.info("Index done doc=%s: segments=%d facts=%d evidence=%d",
+                 source_doc_id, stats["segments_indexed"], stats["facts_indexed"],
+                 stats["evidence_indexed"])
         return stats
 
     # ── Neo4j writers ─────────────────────────────────────────────
