@@ -142,6 +142,11 @@ def _init_schema() -> None:
             meta_context    TEXT,
             relation_source TEXT
         );
+        CREATE TABLE IF NOT EXISTS system_stats_snapshots (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            snapshot        TEXT,
+            created_at      TEXT DEFAULT (datetime('now'))
+        );
     """)
     c.commit()
 

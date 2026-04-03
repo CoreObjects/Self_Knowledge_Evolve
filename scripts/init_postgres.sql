@@ -275,3 +275,14 @@ ON CONFLICT (version_tag) DO NOTHING;
 INSERT INTO governance.ontology_versions (version_tag, description, status)
 VALUES ('v0.2.0', 'Five-layer semantic structure: Concept/Mechanism/Method/Condition/Scenario', 'active')
 ON CONFLICT (version_tag) DO NOTHING;
+
+-- =============================================================
+-- System monitoring: stats snapshots
+-- =============================================================
+CREATE TABLE IF NOT EXISTS system_stats_snapshots (
+    id          BIGSERIAL PRIMARY KEY,
+    snapshot    JSONB NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_stats_created ON system_stats_snapshots(created_at);

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Semantic KB Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; padding: 20px; }
+h1 { font-size: 1.4rem; margin-bottom: 16px; color: #fff; }
+h2 { font-size: 1.1rem; margin: 16px 0 8px; color: #8b95a5; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.card { background: #1a1d27; border-radius: 8px; padding: 16px; text-align: center; }
+.card .value { font-size: 2rem; font-weight: 700; color: #4fc3f7; }
+.card .label { font-size: 0.8rem; color: #8b95a5; margin-top: 4px; }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.panel { background: #1a1d27; border-radius: 8px; padding: 16px; }
+.panel canvas { max-height: 250px; }
+
+.gauge { display: flex; align-items: center; gap: 12px; margin: 8px 0; }
+.gauge-bar { flex: 1; height: 8px; background: #2a2d37; border-radius: 4px; overflow: hidden; }
+.gauge-fill { height: 100%; border-radius: 4px; transition: width 0.5s; }
+.gauge-label { min-width: 140px; font-size: 0.85rem; }
+.gauge-value { min-width: 50px; text-align: right; font-size: 0.85rem; font-weight: 600; }
+
+.green { background: #4caf50; } .yellow { background: #ff9800; } .red { background: #f44336; }
+
+.alert-list { max-height: 200px; overflow-y: auto; font-size: 0.82rem; }
+.alert-item { padding: 6px 8px; border-bottom: 1px solid #2a2d37; cursor: pointer; }
+.alert-item:hover { background: #252830; }
+.alert-item .warn { color: #ff9800; }
+
+.drilldown-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.7); z-index: 100; justify-content: center; align-items: center; }
+.drilldown-modal.active { display: flex; }
+.drilldown-content { background: #1a1d27; border-radius: 12px; padding: 24px; max-width: 800px;
+  width: 90%; max-height: 80vh; overflow-y: auto; }
+.drilldown-content h3 { margin-bottom: 12px; }
+.drilldown-content table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.drilldown-content th, .drilldown-content td { padding: 6px 8px; border-bottom: 1px solid #2a2d37; text-align: left; }
+.drilldown-content th { color: #8b95a5; }
+.close-btn { float: right; cursor: pointer; font-size: 1.2rem; color: #8b95a5; }
+.close-btn:hover { color: #fff; }
+
+.timestamp { font-size: 0.75rem; color: #555; margin-top: 8px; }
+.loading { color: #555; font-style: italic; }
+</style>
+</head>
+<body>
+
+<h1>Semantic Knowledge Base — System Dashboard</h1>
+
+<div class="cards" id="top-cards"></div>
+
+<div class="grid2">
+  <div class="panel">
+    <h2>Knowledge Quality</h2>
+    <div id="quality-gauges"></div>
+  </div>
+  <div class="panel">
+    <h2>Source Distribution</h2>
+    <canvas id="source-chart"></canvas>
+  </div>
+</div>
+
+<div class="grid3">
+  <div class="panel">
+    <h2>Graph Health</h2>
+    <div id="graph-health"></div>
+  </div>
+  <div class="panel">
+    <h2>Ontology Health</h2>
+    <div id="ontology-health"></div>
+  </div>
+  <div class="panel">
+    <h2>Pipeline & Evolution</h2>
+    <div id="pipeline-info"></div>
+  </div>
+</div>
+
+<div class="panel" style="margin-bottom: 20px;">
+  <h2>Trend (last 24h)</h2>
+  <canvas id="trend-chart" height="80"></canvas>
+</div>
+
+<div class="timestamp" id="ts"></div>
+
+<!-- Drilldown modal -->
+<div class="drilldown-modal" id="modal">
+  <div class="drilldown-content">
+    <span class="close-btn" onclick="closeModal()">&times;</span>
+    <h3 id="modal-title"></h3>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+const API = '/api/v1/system';
+const SEM = '/api/v1/semantic';
+
+let currentSnapshot = null;
+let sourceChart = null;
+let trendChart = null;
+
+async function fetchStats() {
+  try {
+    const res = await fetch(`${API}/stats`);
+    const data = await res.json();
+    currentSnapshot = data.snapshot || data;
+    render(currentSnapshot);
+    document.getElementById('ts').textContent = `Last collected: ${data.collected_at || currentSnapshot.timestamp || 'unknown'}`;
+  } catch (e) {
+    document.getElementById('ts').textContent = `Error: ${e.message}`;
+  }
+}
+
+async function fetchHistory() {
+  try {
+    const res = await fetch(`${API}/stats/history?hours=24`);
+    const data = await res.json();
+    renderTrend(data.snapshots || []);
+  } catch (e) { /* ignore */ }
+}
+
+function render(s) {
+  const k = s.knowledge || {};
+  const q = s.quality || {};
+  const gh = s.graph_health || {};
+  const oh = s.ontology_health || {};
+  const pl = s.pipeline || {};
+  const ev = s.evolution || {};
+  const src = s.sources || {};
+
+  // Top cards
+  const docs = k.documents || {};
+  const totalDocs = Object.values(docs).reduce((a, b) => a + b, 0);
+  const facts = k.facts || {};
+  const totalFacts = Object.values(facts).reduce((a, b) => a + b, 0);
+  const segs = k.segments || {};
+  const totalSegs = Object.values(segs).reduce((a, b) => a + b, 0);
+
+  document.getElementById('top-cards').innerHTML = [
+    card(docs.indexed || 0, 'Documents Indexed'),
+    card(totalSegs, 'Segments'),
+    card(totalFacts, 'Facts'),
+    card(k.evidence_total || 0, 'Evidence'),
+    card(k.rst_relations_total || 0, 'RST Relations'),
+    card(k.neo4j_nodes || 0, 'Neo4j Nodes'),
+    card(k.neo4j_relationships || 0, 'Neo4j Rels'),
+  ].join('');
+
+  // Quality gauges
+  document.getElementById('quality-gauges').innerHTML = [
+    gauge('Ontology Coverage', q.ontology_coverage, 'cross_layer_gaps'),
+    gauge('Avg Confidence', q.avg_fact_confidence),
+    gauge('Low Confidence', q.low_confidence_ratio, 'low_confidence_facts', true),
+    gauge('Conflict Ratio', q.conflict_ratio, null, true),
+    gauge('Weak Evidence', q.single_evidence_weak_ratio, 'single_evidence_weak', true),
+    gauge('Dedup Ratio', q.segment_dedup_ratio),
+  ].join('');
+
+  // Graph health
+  document.getElementById('graph-health').innerHTML = `
+    <div class="alert-list">
+      ${alertItem('Isolated Nodes', gh.isolated_node_count, 'isolated_nodes')}
+      ${alertItem('Avg Degree', gh.avg_degree)}
+      ${alertItem('Max Degree', gh.max_degree, 'super_nodes')}
+      ${alertItem('Predicate Usage', `${gh.predicates_used}/${gh.predicates_defined}`, 'unused_predicates')}
+    </div>`;
+
+  // Ontology health
+  document.getElementById('ontology-health').innerHTML = `
+    <div class="alert-list">
+      ${alertItem('Max Inheritance Depth', oh.max_inheritance_depth, 'inheritance_stats')}
+      ${alertItem('Avg Branch Factor', oh.avg_branch_factor)}
+      ${alertItem('Single Child Ratio', pct(oh.single_child_ratio), 'single_child_nodes')}
+      ${alertItem('No-Alias Nodes', oh.no_alias_node_count, 'no_alias_nodes')}
+    </div>`;
+
+  // Pipeline & Evolution
+  const candStatus = (ev.candidates_by_status || {});
+  document.getElementById('pipeline-info').innerHTML = `
+    <div class="alert-list">
+      ${alertItem('Backlog (raw)', pl.backlog, 'backlog_docs')}
+      ${alertItem('Failed', pl.failed_count, 'failed_docs')}
+      ${alertItem('Processed 24h', pl.processed_24h)}
+      ${alertItem('Candidates', Object.values(candStatus).reduce((a,b)=>a+b, 0), 'pending_candidates')}
+    </div>`;
+
+  // Source chart
+  renderSourceChart(src);
+}
+
+function card(value, label) {
+  return `<div class="card"><div class="value">${fmt(value)}</div><div class="label">${label}</div></div>`;
+}
+
+function gauge(label, value, metric, invert) {
+  const v = value || 0;
+  const pctVal = Math.round(v * 100);
+  const color = invert
+    ? (v > 0.15 ? 'red' : v > 0.05 ? 'yellow' : 'green')
+    : (v > 0.6 ? 'green' : v > 0.3 ? 'yellow' : 'red');
+  const click = metric ? `onclick="openDrilldown('${metric}')"` : '';
+  const cursor = metric ? 'style="cursor:pointer"' : '';
+  return `<div class="gauge" ${cursor} ${click}>
+    <span class="gauge-label">${label}</span>
+    <div class="gauge-bar"><div class="gauge-fill ${color}" style="width:${Math.min(pctVal, 100)}%"></div></div>
+    <span class="gauge-value">${pctVal}%</span>
+  </div>`;
+}
+
+function alertItem(label, value, metric) {
+  const click = metric ? `onclick="openDrilldown('${metric}')"` : '';
+  const cls = metric ? 'alert-item' : 'alert-item';
+  const warn = metric ? '<span class="warn"> ▸</span>' : '';
+  return `<div class="${cls}" ${click}>${label}: <strong>${fmt(value)}</strong>${warn}</div>`;
+}
+
+function fmt(v) {
+  if (v === null || v === undefined) return '-';
+  if (typeof v === 'number') return v.toLocaleString();
+  return v;
+}
+function pct(v) { return v != null ? (v * 100).toFixed(1) + '%' : '-'; }
+
+// ── Source chart ──
+function renderSourceChart(src) {
+  const byMethod = src.by_method || {};
+  const ctx = document.getElementById('source-chart');
+  if (sourceChart) sourceChart.destroy();
+  sourceChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(byMethod),
+      datasets: [{ data: Object.values(byMethod), backgroundColor: ['#4fc3f7', '#ff9800', '#4caf50', '#f44336'] }],
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#aaa' } } } },
+  });
+}
+
+// ── Trend chart ──
+function renderTrend(snapshots) {
+  if (!snapshots.length) return;
+  const labels = snapshots.map(s => {
+    const t = s.collected_at || '';
+    return t.substring(11, 16);
+  });
+  const facts = snapshots.map(s => {
+    const k = (s.snapshot || s).knowledge || {};
+    const f = k.facts || {};
+    return Object.values(f).reduce((a, b) => a + b, 0);
+  });
+  const docs = snapshots.map(s => {
+    const k = (s.snapshot || s).knowledge || {};
+    const d = k.documents || {};
+    return d.indexed || 0;
+  });
+
+  const ctx = document.getElementById('trend-chart');
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Facts', data: facts, borderColor: '#4fc3f7', tension: 0.3, pointRadius: 1 },
+        { label: 'Docs Indexed', data: docs, borderColor: '#4caf50', tension: 0.3, pointRadius: 1 },
+      ],
+    },
+    options: {
+      responsive: true,
+      scales: { x: { ticks: { color: '#666' } }, y: { ticks: { color: '#666' } } },
+      plugins: { legend: { labels: { color: '#aaa' } } },
+    },
+  });
+}
+
+// ── Drilldown modal ──
+async function openDrilldown(metric) {
+  document.getElementById('modal-title').textContent = metric.replace(/_/g, ' ');
+  document.getElementById('modal-body').innerHTML = '<p class="loading">Loading...</p>';
+  document.getElementById('modal').classList.add('active');
+
+  try {
+    const res = await fetch(`${API}/drilldown/${metric}?limit=30`);
+    const data = await res.json();
+    const result = data.result || data;
+    document.getElementById('modal-body').innerHTML = renderDrilldownResult(result);
+  } catch (e) {
+    document.getElementById('modal-body').innerHTML = `<p>Error: ${e.message}</p>`;
+  }
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('active');
+}
+
+function renderDrilldownResult(result) {
+  if (result.error) return `<p>${result.error}</p>`;
+
+  // Try to find an array to render as table
+  const arrayKey = Object.keys(result).find(k => Array.isArray(result[k]) && result[k].length > 0);
+  if (!arrayKey) return `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+
+  const items = result[arrayKey];
+  const cols = Object.keys(items[0]);
+  const header = cols.map(c => `<th>${c}</th>`).join('');
+  const rows = items.map(item =>
+    '<tr>' + cols.map(c => `<td>${fmt(item[c])}</td>`).join('') + '</tr>'
+  ).join('');
+
+  return `<table><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// Close modal on outside click
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal')) closeModal();
+});
+
+// ── Init ──
+fetchStats();
+fetchHistory();
+setInterval(fetchStats, 60000);      // refresh stats every 60s
+setInterval(fetchHistory, 300000);   // refresh trend every 5min
+</script>
+</body>
+</html>

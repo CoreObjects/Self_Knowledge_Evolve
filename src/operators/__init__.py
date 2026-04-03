@@ -9,7 +9,11 @@ from src.operators.dependency_op   import DependencyOperator
 from src.operators.impact_op       import ImpactOperator
 from src.operators.evidence_op     import EvidenceRankOperator, ConflictDetectOperator, FactMergeOperator
 from src.operators.evolution_op    import CandidateDiscoverOperator, AttachScoreOperator, EvolutionGateOperator
-from src.operators.search_op       import SemanticSearchOperator, EduSearchOperator
+from src.operators.search_op              import SemanticSearchOperator, EduSearchOperator
+from src.operators.graph_inspect_op       import GraphInspectOperator
+from src.operators.cross_layer_check_op   import CrossLayerCheckOperator
+from src.operators.ontology_inspect_op    import OntologyInspectOperator
+from src.operators.stale_knowledge_op     import StaleKnowledgeOperator
 
 ALL_OPERATORS = [
     LookupOperator(),
@@ -27,4 +31,8 @@ ALL_OPERATORS = [
     EvolutionGateOperator(),
     SemanticSearchOperator(),
     EduSearchOperator(),
+    GraphInspectOperator(),
+    CrossLayerCheckOperator(),
+    OntologyInspectOperator(),
+    StaleKnowledgeOperator(),
 ]

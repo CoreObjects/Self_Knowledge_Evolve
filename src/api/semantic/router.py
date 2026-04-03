@@ -333,3 +333,57 @@ def edu_search(body: EduSearchRequest, _app = Depends(get_app)):
         ))
     except Exception as exc:
         return _err(str(exc))
+
+
+# ── Inspection & Health ──────────────────────────────────────────────────────
+
+@router.get("/graph_inspect")
+def graph_inspect(
+    inspect_type: str = Query(..., description="isolated_nodes|super_nodes|degree_distribution|predicate_concentration|unused_predicates"),
+    threshold:    int = Query(50),
+    limit:        int = Query(50),
+    _app = Depends(get_app),
+):
+    try:
+        return _wrap(_app.query("graph_inspect", inspect_type=inspect_type, threshold=threshold, limit=limit))
+    except Exception as exc:
+        return _err(str(exc))
+
+
+@router.get("/cross_layer_check")
+def cross_layer_check(
+    source_layer: str | None = Query(None, description="concept|mechanism|method|condition|scenario"),
+    target_layer: str | None = Query(None),
+    gaps:         bool       = Query(False, description="Include gap node list"),
+    limit:        int        = Query(50),
+    _app = Depends(get_app),
+):
+    try:
+        return _wrap(_app.query("cross_layer_check", source_layer=source_layer, target_layer=target_layer, gaps=gaps, limit=limit))
+    except Exception as exc:
+        return _err(str(exc))
+
+
+@router.get("/ontology_inspect")
+def ontology_inspect(
+    inspect_type: str = Query(..., description="inheritance_stats|single_child|no_alias|alias_conflicts"),
+    limit:        int = Query(50),
+    _app = Depends(get_app),
+):
+    try:
+        return _wrap(_app.query("ontology_inspect", inspect_type=inspect_type, limit=limit))
+    except Exception as exc:
+        return _err(str(exc))
+
+
+@router.get("/stale_knowledge")
+def stale_knowledge(
+    type: str = Query("fact", description="fact|doc|weak_evidence"),
+    days: int = Query(90),
+    limit: int = Query(50),
+    _app = Depends(get_app),
+):
+    try:
+        return _wrap(_app.query("stale_knowledge", type=type, days=days, limit=limit))
+    except Exception as exc:
+        return _err(str(exc))

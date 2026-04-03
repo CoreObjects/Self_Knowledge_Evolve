@@ -9,13 +9,17 @@ from __future__ import annotations
 
 import logging
 
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from src.config.settings import settings
 from src.db import health_check
 from src.utils.health import startup_health_check
 from src.api.semantic.router import router as semantic_router
+from src.api.system.router import router as system_router
 from src.utils.logging import setup_logging
 
 app = FastAPI(
@@ -44,6 +48,12 @@ async def on_startup() -> None:
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(semantic_router)
+app.include_router(system_router)
+
+# ── Static files (dashboard) ─────────────────────────────────────────────────
+_static_dir = Path(__file__).resolve().parents[1] / "static"
+if _static_dir.is_dir():
+    app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 
 # ── Utility endpoints ─────────────────────────────────────────────────────────
@@ -53,6 +63,11 @@ def health() -> dict:
     status = health_check()
     status["status"] = "ok" if all(status.values()) else "degraded"
     return status
+
+
+@app.get("/dashboard", include_in_schema=False)
+def dashboard():
+    return RedirectResponse(url="/static/dashboard.html")
 
 
 @app.get("/", include_in_schema=False)
