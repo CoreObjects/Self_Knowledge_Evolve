@@ -75,7 +75,7 @@ def _check_pair(
 
     connected_rows = graph.read(
         f"""
-        MATCH (n:{src_label})-[:RELATED_TO]-(m:{tgt_label})
+        MATCH (n:{src_label})-[r_fact WHERE r_fact.predicate IS NOT NULL]-(m:{tgt_label})
         WHERE n.lifecycle_state = 'active'
         RETURN count(DISTINCT n) AS cnt
         """
@@ -97,7 +97,7 @@ def _check_pair(
             f"""
             MATCH (n:{src_label})
             WHERE n.lifecycle_state = 'active'
-              AND NOT EXISTS {{ MATCH (n)-[:RELATED_TO]-(:{tgt_label}) }}
+              AND NOT EXISTS {{ MATCH (n)-[r_fact WHERE r_fact.predicate IS NOT NULL]-(:{tgt_label}) }}
             RETURN n.node_id AS node_id, n.canonical_name AS name
             ORDER BY n.node_id
             LIMIT $limit

@@ -32,8 +32,8 @@ def _isolated_nodes(*, graph: GraphStore, **_kw) -> dict:
         """
         MATCH (n:OntologyNode)
         WHERE n.lifecycle_state = 'active'
-        OPTIONAL MATCH (n)-[r:RELATED_TO]-()
-        WITH n, count(r) AS rel_count
+        OPTIONAL MATCH (n)-[r_fact WHERE r_fact.predicate IS NOT NULL]-()
+        WITH n, count(r_fact) AS rel_count
         WHERE rel_count = 0
         RETURN n.node_id AS node_id, n.canonical_name AS name,
                labels(n) AS labels
@@ -51,8 +51,8 @@ def _super_nodes(*, graph: GraphStore, threshold: int, limit: int, **_kw) -> dic
         """
         MATCH (n:OntologyNode)
         WHERE n.lifecycle_state = 'active'
-        OPTIONAL MATCH (n)-[r:RELATED_TO]-()
-        WITH n, count(r) AS degree
+        OPTIONAL MATCH (n)-[r_fact WHERE r_fact.predicate IS NOT NULL]-()
+        WITH n, count(r_fact) AS degree
         WHERE degree > $threshold
         RETURN n.node_id AS node_id, n.canonical_name AS name, degree
         ORDER BY degree DESC
@@ -66,8 +66,8 @@ def _super_nodes(*, graph: GraphStore, threshold: int, limit: int, **_kw) -> dic
         # Get predicate distribution for this node
         pred_rows = graph.read(
             """
-            MATCH (n:OntologyNode {node_id: $nid})-[r:RELATED_TO]-()
-            RETURN r.predicate AS predicate, count(r) AS cnt
+            MATCH (n:OntologyNode {node_id: $nid})-[r_fact WHERE r_fact.predicate IS NOT NULL]-()
+            RETURN r_fact.predicate AS predicate, count(r_fact) AS cnt
             ORDER BY cnt DESC LIMIT 5
             """,
             nid=r["node_id"],
@@ -84,8 +84,8 @@ def _degree_distribution(*, graph: GraphStore, **_kw) -> dict:
         """
         MATCH (n:OntologyNode)
         WHERE n.lifecycle_state = 'active'
-        OPTIONAL MATCH (n)-[r:RELATED_TO]-()
-        WITH n, count(r) AS degree
+        OPTIONAL MATCH (n)-[r_fact WHERE r_fact.predicate IS NOT NULL]-()
+        WITH n, count(r_fact) AS degree
         RETURN avg(degree) AS avg_degree,
                percentileCont(degree, 0.5) AS median_degree,
                max(degree) AS max_degree,
@@ -103,9 +103,9 @@ def _predicate_concentration(*, graph: GraphStore, limit: int, **_kw) -> dict:
     """Nodes where edges are concentrated on a single predicate type."""
     rows = graph.read(
         """
-        MATCH (n:OntologyNode)-[r:RELATED_TO]-()
+        MATCH (n:OntologyNode)-[r_fact WHERE r_fact.predicate IS NOT NULL]-()
         WHERE n.lifecycle_state = 'active'
-        WITH n, r.predicate AS pred, count(r) AS pred_cnt
+        WITH n, r_fact.predicate AS pred, count(r_fact) AS pred_cnt
         ORDER BY n.node_id, pred_cnt DESC
         WITH n, collect({predicate: pred, count: pred_cnt}) AS preds,
              sum(pred_cnt) AS total

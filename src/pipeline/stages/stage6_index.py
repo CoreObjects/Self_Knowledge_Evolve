@@ -173,9 +173,14 @@ class IndexStage(Stage):
     def _index_facts(self, facts: list[dict]) -> int:
         count = 0
         for f in facts:
+            # Use the predicate as the Neo4j relationship type (uppercased)
+            # so graph browsers show meaningful edge labels instead of generic RELATED_TO.
+            # Predicate values come from the controlled ontology relation set (54 types),
+            # so dynamic Cypher construction is safe here.
+            rel_type = self._predicate_to_rel_type(f["predicate"])
             self._graph.write(
-                """
-                MERGE (f:Fact {fact_id: $fact_id})
+                f"""
+                MERGE (f:Fact {{fact_id: $fact_id}})
                 SET f.subject          = $subject,
                     f.predicate        = $predicate,
                     f.object           = $object,
@@ -184,10 +189,10 @@ class IndexStage(Stage):
                     f.lifecycle_state  = $lifecycle_state,
                     f.ontology_version = $ontology_version
                 WITH f
-                MATCH (a:OntologyNode {node_id: $subject})
-                MATCH (b:OntologyNode {node_id: $object})
-                MERGE (a)-[r:RELATED_TO {predicate: $predicate, fact_id: $fact_id}]->(b)
-                SET r.confidence = $confidence
+                MATCH (a:OntologyNode {{node_id: $subject}})
+                MATCH (b:OntologyNode {{node_id: $object}})
+                MERGE (a)-[r:{rel_type} {{fact_id: $fact_id}}]->(b)
+                SET r.confidence = $confidence, r.predicate = $predicate
                 """,
                 fact_id=str(f["fact_id"]),
                 subject=f["subject"],
@@ -263,6 +268,17 @@ class IndexStage(Stage):
                 tagger=tag.get("tagger") or "rule",
                 tag_type=tag.get("tag_type") or "canonical",
             )
+
+    @staticmethod
+    def _predicate_to_rel_type(predicate: str) -> str:
+        """Convert ontology predicate ID to a Neo4j relationship type name.
+
+        Examples: uses_protocol → USES_PROTOCOL, is_a → IS_A
+        Only alphanumerics and underscores are kept (Neo4j constraint).
+        """
+        import re
+        cleaned = re.sub(r"[^a-zA-Z0-9_]", "_", predicate)
+        return cleaned.upper()
 
     def _write_embeddings(self, segments: list[dict]) -> None:
         """Generate embeddings for segments and store in PG (best-effort)."""

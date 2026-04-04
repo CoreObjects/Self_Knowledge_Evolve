@@ -44,7 +44,7 @@ class StatsCollector:
         facts = self._count_grouped(s, "facts", "lifecycle_state")
 
         neo4j_nodes = self._neo4j_count("MATCH (n) RETURN count(n) AS cnt")
-        neo4j_rels = self._neo4j_count("MATCH ()-[r]->() RETURN count(r) AS cnt")
+        neo4j_rels = self._neo4j_count("MATCH ()-[r]->() RETURN count(r_fact) AS cnt")
 
         return {
             "documents": docs,
@@ -69,7 +69,7 @@ class StatsCollector:
             "MATCH (n:OntologyNode) WHERE n.lifecycle_state='active' RETURN count(n) AS cnt"
         )
         covered_nodes = self._neo4j_count(
-            """MATCH (n:OntologyNode)-[:RELATED_TO]-()
+            """MATCH (n:OntologyNode)-[r_fact WHERE r_fact.predicate IS NOT NULL]-()
                WHERE n.lifecycle_state='active'
                RETURN count(DISTINCT n) AS cnt"""
         )
@@ -163,8 +163,8 @@ class StatsCollector:
         iso_rows = g.read(
             """MATCH (n:OntologyNode)
                WHERE n.lifecycle_state='active'
-               OPTIONAL MATCH (n)-[r:RELATED_TO]-()
-               WITH n, count(r) AS rc WHERE rc = 0
+               OPTIONAL MATCH (n)-[r_fact WHERE r_fact.predicate IS NOT NULL]-()
+               WITH n, count(r_fact) AS rc WHERE rc = 0
                RETURN count(n) AS cnt"""
         )
         isolated = iso_rows[0]["cnt"] if iso_rows else 0
@@ -173,8 +173,8 @@ class StatsCollector:
         deg_rows = g.read(
             """MATCH (n:OntologyNode)
                WHERE n.lifecycle_state='active'
-               OPTIONAL MATCH (n)-[r:RELATED_TO]-()
-               WITH n, count(r) AS degree
+               OPTIONAL MATCH (n)-[r_fact WHERE r_fact.predicate IS NOT NULL]-()
+               WITH n, count(r_fact) AS degree
                RETURN avg(degree) AS avg_deg, max(degree) AS max_deg"""
         )
         deg = dict(deg_rows[0]) if deg_rows else {}
