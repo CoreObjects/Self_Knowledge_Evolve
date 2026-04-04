@@ -173,10 +173,10 @@ class OntologyQualityCalculator:
                     if jaccard > 0.3:
                         pred_pairs_jaccard[(p1, p2)] = round(jaccard, 4)
 
-        overlapping = {k: v for k, v in pred_pairs_jaccard.items() if v > 0.5}
-        for (p1, p2), jac in sorted(overlapping.items(), key=lambda x: -x[1])[:5]:
-            issues.append({"type": "predicate_overlap", "pair": [p1, p2], "jaccard": jac,
-                           "suggestion": f"Semantic overlap between {p1} and {p2}"})
+        overlapping = {f"{k[0]} ↔ {k[1]}": v for k, v in pred_pairs_jaccard.items() if v > 0.5}
+        for pair_key, jac in sorted(overlapping.items(), key=lambda x: -x[1])[:5]:
+            issues.append({"type": "predicate_overlap", "pair": pair_key, "jaccard": jac,
+                           "suggestion": f"Semantic overlap: {pair_key}"})
 
         # O2: Predicate distribution skew
         pred_counts = Counter(f["predicate"] for f in facts)
