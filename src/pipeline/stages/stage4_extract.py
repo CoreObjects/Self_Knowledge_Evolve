@@ -81,23 +81,30 @@ class ExtractStage(Stage):
         llm_count = 0
         rule_count = 0
 
+        cooccurrence_count = 0
         for seg in segments:
-            # LLM first — higher quality, structured extraction
+            # Priority 1: LLM extraction (highest quality)
             llm_facts = self.extract_facts_llm(seg, source_rank)
             if llm_facts:
                 all_facts.extend(llm_facts)
                 llm_count += len(llm_facts)
-                log.debug("  seg=%s llm=%d nodes=%d",
-                          str(seg["segment_id"])[:12], len(llm_facts),
-                          len(seg.get("canonical_nodes") or []))
-            else:
-                # LLM unavailable or returned nothing → fall back to rule-based
-                rule_facts = self.extract_facts(seg, source_rank)
-                all_facts.extend(rule_facts)
-                rule_count += len(rule_facts)
-                log.debug("  seg=%s rule=%d nodes=%d",
-                          str(seg["segment_id"])[:12], len(rule_facts),
-                          len(seg.get("canonical_nodes") or []))
+                log.debug("  seg=%s llm=%d", str(seg["segment_id"])[:12], len(llm_facts))
+                continue
+
+            # Priority 2: Regex pattern matching (medium quality)
+            regex_facts = self._extract_regex(seg, source_rank)
+            if regex_facts:
+                all_facts.extend(regex_facts)
+                rule_count += len(regex_facts)
+                log.debug("  seg=%s regex=%d", str(seg["segment_id"])[:12], len(regex_facts))
+                continue
+
+            # Priority 3: Co-occurrence (last resort, low quality)
+            cooc_facts = self._extract_cooccurrence(seg, source_rank)
+            if cooc_facts:
+                all_facts.extend(cooc_facts)
+                cooccurrence_count += len(cooc_facts)
+                log.debug("  seg=%s cooccurrence=%d", str(seg["segment_id"])[:12], len(cooc_facts))
 
         self._save_facts(all_facts, source_doc_id)
         self._crawler_store.execute(
@@ -108,56 +115,23 @@ class ExtractStage(Stage):
         fact_ids = [f["fact_id"] for f in all_facts]
         id_preview = self._preview_ids(fact_ids)
         log.info(
-            "Extracted facts doc=%s total=%d rule=%d llm=%d fact_ids=%s",
+            "Extracted facts doc=%s total=%d llm=%d regex=%d cooccurrence=%d fact_ids=%s",
             source_doc_id,
             len(all_facts),
-            rule_count,
             llm_count,
+            rule_count,
+            cooccurrence_count,
             id_preview,
         )
         return all_facts
 
-    def extract_facts(self, segment: dict, source_rank: str) -> list[dict]:
-        """Rule R1-R4: apply patterns, validate, score.
-
-        Two strategies:
-        1. Regex capture groups: pattern matches → resolve subject/object to ontology
-        2. Co-occurrence + predicate signal: when 2+ canonical nodes share a segment
-           and a relation predicate keyword is detected, infer the relation between them
-        """
+    def _extract_regex(self, segment: dict, source_rank: str) -> list[dict]:
+        """Priority 2: Regex capture groups — resolve subject/object to ontology nodes."""
         text = segment.get("normalized_text") or segment.get("raw_text", "")
         ontology = self._ontology
         facts: list[dict] = []
-        seen: set[tuple[str, str, str]] = set()  # dedup (subj, pred, obj)
+        seen: set[tuple[str, str, str]] = set()
 
-        def _add_fact(subj_id: str, predicate: str, obj_id: str) -> None:
-            key = (subj_id, predicate, obj_id)
-            if key in seen or subj_id == obj_id:
-                return
-            seen.add(key)
-            conf = score_fact(
-                source_rank=source_rank,
-                extraction_method="rule",
-                ontology_fit=0.85,
-                cross_source_consistency=0.5,
-                temporal_validity=1.0,
-            )
-            facts.append({
-                "fact_id":           str(uuid.uuid4()),
-                "subject":           subj_id,
-                "predicate":         predicate,
-                "object":            obj_id,
-                "qualifier":         {},
-                "domain":            subj_id.split(".")[0] if "." in subj_id else None,
-                "confidence":        conf,
-                "extraction_method": "rule",
-                "segment_id":        segment["segment_id"],
-                "source_rank":       source_rank,
-                "lifecycle_state":   "active",
-                "ontology_version":  "v0.2.0",
-            })
-
-        # Strategy 1: regex capture groups (original)
         for pattern, predicate in RELATION_PATTERNS:
             if not ontology.is_valid_relation(predicate):
                 continue
@@ -166,27 +140,72 @@ class ExtractStage(Stage):
                 obj_raw = m.group(2).strip()
                 subj_id = self._resolve_term(subj_raw)
                 obj_id = self._resolve_term(obj_raw)
-                if subj_id and obj_id:
-                    _add_fact(subj_id, predicate, obj_id)
-
-        # Strategy 2: co-occurrence + predicate signal
-        # Only apply when segment has a manageable number of nodes to avoid
-        # combinatorial explosion (n*(n-1)/2 pairs × predicates)
-        canonical_nodes = segment.get("canonical_nodes") or []
-        max_nodes_for_cooccurrence = 6
-        if 2 <= len(canonical_nodes) <= max_nodes_for_cooccurrence:
-            detected_predicates = self._detect_predicates(text)
-            # Limit to strongest single predicate signal to keep facts focused
-            if len(detected_predicates) > 2:
-                detected_predicates = detected_predicates[:2]
-            for predicate in detected_predicates:
-                if not ontology.is_valid_relation(predicate):
+                if not subj_id or not obj_id or subj_id == obj_id:
                     continue
-                for i, subj_id in enumerate(canonical_nodes):
-                    for obj_id in canonical_nodes[i + 1:]:
-                        _add_fact(subj_id, predicate, obj_id)
-
+                key = (subj_id, predicate, obj_id)
+                if key in seen:
+                    continue
+                seen.add(key)
+                facts.append(self._build_fact(
+                    subj_id, predicate, obj_id, segment, source_rank, "rule",
+                ))
         return facts
+
+    def _extract_cooccurrence(self, segment: dict, source_rank: str) -> list[dict]:
+        """Priority 3 (last resort): Co-occurrence when regex and LLM both returned nothing.
+
+        Strict guards:
+        - Only when exactly 2 canonical nodes co-occur (no combinatorial explosion)
+        - Only 1 predicate signal (the strongest match)
+        - Lower confidence than regex/LLM
+        """
+        canonical_nodes = segment.get("canonical_nodes") or []
+        if len(canonical_nodes) != 2:
+            return []
+
+        text = segment.get("normalized_text") or segment.get("raw_text", "")
+        detected = self._detect_predicates(text)
+        if not detected:
+            return []
+
+        ontology = self._ontology
+        predicate = detected[0]  # only the single strongest signal
+        if not ontology.is_valid_relation(predicate):
+            return []
+
+        subj_id, obj_id = canonical_nodes[0], canonical_nodes[1]
+        if subj_id == obj_id:
+            return []
+
+        return [self._build_fact(
+            subj_id, predicate, obj_id, segment, source_rank, "cooccurrence",
+        )]
+
+    def _build_fact(
+        self, subj_id: str, predicate: str, obj_id: str,
+        segment: dict, source_rank: str, extraction_method: str,
+    ) -> dict:
+        conf = score_fact(
+            source_rank=source_rank,
+            extraction_method="rule" if extraction_method != "llm" else "llm",
+            ontology_fit=0.85 if extraction_method == "rule" else 0.60,
+            cross_source_consistency=0.5,
+            temporal_validity=1.0,
+        )
+        return {
+            "fact_id":           str(uuid.uuid4()),
+            "subject":           subj_id,
+            "predicate":         predicate,
+            "object":            obj_id,
+            "qualifier":         {},
+            "domain":            subj_id.split(".")[0] if "." in subj_id else None,
+            "confidence":        conf,
+            "extraction_method": extraction_method,
+            "segment_id":        segment["segment_id"],
+            "source_rank":       source_rank,
+            "lifecycle_state":   "active",
+            "ontology_version":  "v0.2.0",
+        }
 
     @staticmethod
     def _detect_predicates(text: str) -> list[str]:
