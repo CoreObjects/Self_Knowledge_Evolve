@@ -124,7 +124,9 @@ h2 { font-size: 1.1rem; margin: 16px 0 8px; color: #8b95a5; }
 </div><!-- end tab-monitor -->
 
 <div id="tab-quality" class="tab-content">
-  <h2>Ontology Quality Assessment</h2>
+  <h2>Ontology Quality Assessment <span id="quality-ts" style="font-size:0.7rem;color:#555;margin-left:12px;"></span></h2>
+
+  <!-- Top: radar + overall -->
   <div class="grid2">
     <div class="panel">
       <h2>Dimension Scores</h2>
@@ -132,17 +134,50 @@ h2 { font-size: 1.1rem; margin: 16px 0 8px; color: #8b95a5; }
     </div>
     <div class="panel">
       <h2>Overall Score</h2>
-      <div id="overall-score" style="text-align:center;padding:40px 0;">
+      <div id="overall-score" style="text-align:center;padding:30px 0;">
         <div style="font-size:4rem;font-weight:700;color:#4fc3f7;">—</div>
         <div style="color:#8b95a5;">Loading...</div>
       </div>
+      <button class="btn btn-approve" onclick="loadQuality()" style="width:100%;margin-top:8px;">Refresh Now</button>
     </div>
   </div>
-  <div class="panel" style="margin-bottom:16px;">
-    <h2>Issues</h2>
-    <div id="quality-issues" class="alert-list"><p class="loading">Click to load quality report</p></div>
+
+  <!-- 5 dimension detail panels -->
+  <div class="grid2" style="margin-top:16px;">
+    <!-- G: Granularity -->
+    <div class="panel">
+      <h2>G: Granularity (粒度合理性)</h2>
+      <div id="q-granularity" class="alert-list"><p class="loading">—</p></div>
+    </div>
+    <!-- O: Orthogonality -->
+    <div class="panel">
+      <h2>O: Orthogonality (正交性)</h2>
+      <div id="q-orthogonality" class="alert-list"><p class="loading">—</p></div>
+    </div>
   </div>
-  <button class="btn btn-approve" onclick="loadQuality()" style="margin-bottom:16px;">Compute Quality Report</button>
+  <div class="grid3" style="margin-top:12px;">
+    <!-- L: Cross-layer -->
+    <div class="panel">
+      <h2>L: Cross-Layer (层间连通)</h2>
+      <div id="q-cross-layer" class="alert-list"><p class="loading">—</p></div>
+    </div>
+    <!-- D: Discoverability -->
+    <div class="panel">
+      <h2>D: Discoverability (可发现性)</h2>
+      <div id="q-discoverability" class="alert-list"><p class="loading">—</p></div>
+    </div>
+    <!-- S: Structural -->
+    <div class="panel">
+      <h2>S: Structural (结构健康)</h2>
+      <div id="q-structural" class="alert-list"><p class="loading">—</p></div>
+    </div>
+  </div>
+
+  <!-- Issues -->
+  <div class="panel" style="margin-top:12px;">
+    <h2>All Issues (<span id="issue-count">0</span>)</h2>
+    <div id="quality-issues" class="alert-list"><p class="loading">—</p></div>
+  </div>
 </div>
 
 <div id="tab-review" class="tab-content">
@@ -401,6 +436,7 @@ function switchTab(name) {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   document.querySelector(`[onclick="switchTab('${name}')"]`).classList.add('active');
   document.getElementById(`tab-${name}`).classList.add('active');
+  if (name === 'quality') startQualityAutoRefresh();
   if (name === 'review') loadReviewList();
 }
 
@@ -505,16 +541,24 @@ async function rejectCandidate(id) {
 
 // ── Ontology Quality ──
 let radarChart = null;
+let qualityAutoRefresh = null;
 
 async function loadQuality() {
-  document.getElementById('quality-issues').innerHTML = '<p class="loading">Computing... (may take a minute)</p>';
   try {
     const res = await fetch(`${SEM}/ontology_quality`);
     const data = await res.json();
     const q = data.result || data;
     renderQuality(q);
+    document.getElementById('quality-ts').textContent = `Updated: ${new Date().toLocaleTimeString()}`;
   } catch (e) {
     document.getElementById('quality-issues').innerHTML = `<p>Error: ${e.message}</p>`;
+  }
+}
+
+function startQualityAutoRefresh() {
+  if (!qualityAutoRefresh) {
+    loadQuality();
+    qualityAutoRefresh = setInterval(loadQuality, 300000); // every 5 min
   }
 }
 
@@ -527,7 +571,8 @@ function renderQuality(q) {
   const color = overall > 0.7 ? '#4caf50' : overall > 0.4 ? '#ff9800' : '#f44336';
   document.getElementById('overall-score').innerHTML =
     `<div style="font-size:4rem;font-weight:700;color:${color};">${(overall * 100).toFixed(0)}%</div>
-     <div style="color:#8b95a5;">${issues.length} issues found</div>`;
+     <div style="color:#8b95a5;">${issues.length} issues found</div>
+     <button class="btn btn-approve" onclick="loadQuality()" style="width:100%;margin-top:8px;">Refresh Now</button>`;
 
   // Radar chart
   const labels = Object.keys(scores).map(k => k.charAt(0).toUpperCase() + k.slice(1));
@@ -536,24 +581,22 @@ function renderQuality(q) {
   if (radarChart) radarChart.destroy();
   radarChart = new Chart(ctx, {
     type: 'radar',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Quality %',
-        data: values,
-        backgroundColor: 'rgba(79, 195, 247, 0.2)',
-        borderColor: '#4fc3f7',
-        pointBackgroundColor: '#4fc3f7',
-      }],
-    },
-    options: {
-      responsive: true,
-      scales: { r: { beginAtZero: true, max: 100, ticks: { color: '#666' }, grid: { color: '#2a2d37' }, pointLabels: { color: '#aaa' } } },
-      plugins: { legend: { display: false } },
-    },
+    data: { labels, datasets: [{ label: 'Quality %', data: values,
+      backgroundColor: 'rgba(79,195,247,0.2)', borderColor: '#4fc3f7', pointBackgroundColor: '#4fc3f7' }] },
+    options: { responsive: true,
+      scales: { r: { beginAtZero: true, max: 100, ticks: { color: '#666' }, grid: { color: '#2a2d37' }, pointLabels: { color: '#aaa', font: { size: 11 } } } },
+      plugins: { legend: { display: false } } },
   });
 
-  // Issues list
+  // ── Dimension detail panels ──
+  renderGranularity(q.granularity || {});
+  renderOrthogonality(q.orthogonality || {});
+  renderCrossLayer(q.cross_layer || {});
+  renderDiscoverability(q.discoverability || {});
+  renderStructural(q.structural || {});
+
+  // Issues
+  document.getElementById('issue-count').textContent = issues.length;
   if (!issues.length) {
     document.getElementById('quality-issues').innerHTML = '<p style="color:#4caf50">No issues detected!</p>';
     return;
@@ -562,12 +605,81 @@ function renderQuality(q) {
     const typeColor = issue.type.includes('cycle') ? '#f44336' : '#ff9800';
     return `<div class="alert-item">
       <span style="color:${typeColor}">⚠ ${issue.type}</span>
-      ${issue.value !== undefined ? ` — ${JSON.stringify(issue.value)}` : ''}
+      ${issue.value !== undefined ? ` — ${typeof issue.value === 'number' ? issue.value.toFixed(4) : JSON.stringify(issue.value)}` : ''}
       ${issue.pair ? ` — ${JSON.stringify(issue.pair)}` : ''}
       ${issue.jaccard ? ` (Jaccard: ${issue.jaccard})` : ''}
       <div style="font-size:0.75rem;color:#666;margin-top:2px;">${issue.suggestion || ''}</div>
     </div>`;
   }).join('');
+}
+
+function indicatorRow(id, label, value, healthy, unit) {
+  const v = value != null ? (typeof value === 'number' ? value : value) : '—';
+  const display = unit === '%' ? (v * 100).toFixed(1) + '%' : (typeof v === 'number' ? v.toFixed(4) : v);
+  const ok = healthy !== undefined ? healthy : true;
+  const dot = ok ? '🟢' : '🟡';
+  return `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:0.82rem;">
+    <span>${dot} <strong>${id}</strong> ${label}</span><span style="color:#4fc3f7;">${display}</span></div>`;
+}
+
+function renderGranularity(g) {
+  const html = [
+    indicatorRow('G1', 'Gini 系数', g.G1_gini, g.G1_gini <= 0.8),
+    indicatorRow('G2', '超级节点比例', g.G2_super_ratio, g.G2_super_ratio < 0.1, '%'),
+    indicatorRow('G3', '孤立节点比例', g.G3_isolation_ratio, g.G3_isolation_ratio < 0.4, '%'),
+    indicatorRow('G4', '段落平均标签数', g.G4_avg_tags_per_segment, g.G4_avg_tags_per_segment <= 8),
+    indicatorRow('G5', '万金油节点', (g.G5_ubiquitous_nodes||[]).length, (g.G5_ubiquitous_nodes||[]).length <= 2),
+    `<div style="text-align:right;margin-top:4px;font-size:0.8rem;color:#8b95a5;">Score: <strong>${((g.score||0)*100).toFixed(0)}%</strong></div>`,
+  ].join('');
+  document.getElementById('q-granularity').innerHTML = html;
+}
+
+function renderOrthogonality(o) {
+  const overlaps = Object.keys(o.O1_overlapping_predicates || {}).length;
+  const html = [
+    indicatorRow('O1', '谓语重叠对数', overlaps, overlaps === 0),
+    indicatorRow('O2', 'Top3 谓语占比', o.O2_top3_predicate_ratio, o.O2_top3_predicate_ratio < 0.6, '%'),
+    indicatorRow('O3', '集中度异常节点', o.O3_concentrated_nodes, o.O3_concentrated_nodes <= 5),
+    indicatorRow('O4', '谓语利用率', o.O4_predicate_utilization, o.O4_predicate_utilization > 0.5, '%'),
+    `<div style="text-align:right;margin-top:4px;font-size:0.8rem;color:#8b95a5;">Score: <strong>${((o.score||0)*100).toFixed(0)}%</strong></div>`,
+  ].join('');
+  document.getElementById('q-orthogonality').innerHTML = html;
+}
+
+function renderCrossLayer(l) {
+  const cov = l.L1_coverage || {};
+  const rows = Object.entries(cov).map(([k, v]) => {
+    const pct = (v * 100).toFixed(1);
+    const color = v > 0.3 ? '#4caf50' : v > 0.1 ? '#ff9800' : '#f44336';
+    return `<div style="display:flex;justify-content:space-between;padding:2px 0;font-size:0.78rem;">
+      <span>${k}</span><span style="color:${color};font-weight:600;">${pct}%</span></div>`;
+  }).join('');
+  const html = rows +
+    indicatorRow('L2', '短路边数', l.L2_direct_concept_scenario, true) +
+    indicatorRow('L3', '完整路径数', l.L3_complete_paths, l.L3_complete_paths > 0) +
+    `<div style="text-align:right;margin-top:4px;font-size:0.8rem;color:#8b95a5;">Score: <strong>${((l.score||0)*100).toFixed(0)}%</strong></div>`;
+  document.getElementById('q-cross-layer').innerHTML = html;
+}
+
+function renderDiscoverability(d) {
+  const html = [
+    indicatorRow('D1', '别名覆盖率', d.D1_alias_coverage, d.D1_alias_coverage > 0.5, '%'),
+    indicatorRow('D3', '关系类型利用率', d.D3_relation_utilization, d.D3_relation_utilization > 0.5, '%'),
+    indicatorRow('D4', '标签命中率', d.D4_tag_hit_rate, d.D4_tag_hit_rate > 0.3, '%'),
+    `<div style="text-align:right;margin-top:4px;font-size:0.8rem;color:#8b95a5;">Score: <strong>${((d.score||0)*100).toFixed(0)}%</strong></div>`,
+  ].join('');
+  document.getElementById('q-discoverability').innerHTML = html;
+}
+
+function renderStructural(s) {
+  const html = [
+    indicatorRow('S1', '已连接节点', s.S1_connected_nodes, true),
+    indicatorRow('S1', '孤立节点', s.S1_disconnected_nodes, s.S1_disconnected_nodes < 50),
+    indicatorRow('S2', '依赖环', s.S2_dependency_cycles, s.S2_dependency_cycles === 0),
+    indicatorRow('S5', '平均最短路径', s.S5_avg_shortest_path, true),
+    `<div style="text-align:right;margin-top:4px;font-size:0.8rem;color:#8b95a5;">Score: <strong>${((s.score||0)*100).toFixed(0)}%</strong></div>`,
+  ].join('');
+  document.getElementById('q-structural').innerHTML = html;
 }
 
 // ── Init ──
