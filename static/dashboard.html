@@ -80,6 +80,7 @@ h2 { font-size: 1.1rem; margin: 16px 0 8px; color: #8b95a5; }
 
 <div class="tabs">
   <div class="tab active" onclick="switchTab('monitor')">Monitor</div>
+  <div class="tab" onclick="switchTab('quality')">Ontology Quality</div>
   <div class="tab" onclick="switchTab('review')">Review Candidates</div>
 </div>
 
@@ -121,6 +122,28 @@ h2 { font-size: 1.1rem; margin: 16px 0 8px; color: #8b95a5; }
 <div class="timestamp" id="ts"></div>
 
 </div><!-- end tab-monitor -->
+
+<div id="tab-quality" class="tab-content">
+  <h2>Ontology Quality Assessment</h2>
+  <div class="grid2">
+    <div class="panel">
+      <h2>Dimension Scores</h2>
+      <canvas id="radar-chart" height="250"></canvas>
+    </div>
+    <div class="panel">
+      <h2>Overall Score</h2>
+      <div id="overall-score" style="text-align:center;padding:40px 0;">
+        <div style="font-size:4rem;font-weight:700;color:#4fc3f7;">—</div>
+        <div style="color:#8b95a5;">Loading...</div>
+      </div>
+    </div>
+  </div>
+  <div class="panel" style="margin-bottom:16px;">
+    <h2>Issues</h2>
+    <div id="quality-issues" class="alert-list"><p class="loading">Click to load quality report</p></div>
+  </div>
+  <button class="btn btn-approve" onclick="loadQuality()" style="margin-bottom:16px;">Compute Quality Report</button>
+</div>
 
 <div id="tab-review" class="tab-content">
   <h2>Candidate Review</h2>
@@ -478,6 +501,73 @@ async function rejectCandidate(id) {
     alert(`Error: ${e.message}`);
     card.querySelectorAll('.btn').forEach(b => b.disabled = false);
   }
+}
+
+// ── Ontology Quality ──
+let radarChart = null;
+
+async function loadQuality() {
+  document.getElementById('quality-issues').innerHTML = '<p class="loading">Computing... (may take a minute)</p>';
+  try {
+    const res = await fetch(`${SEM}/ontology_quality`);
+    const data = await res.json();
+    const q = data.result || data;
+    renderQuality(q);
+  } catch (e) {
+    document.getElementById('quality-issues').innerHTML = `<p>Error: ${e.message}</p>`;
+  }
+}
+
+function renderQuality(q) {
+  const scores = q.scores || {};
+  const overall = q.overall_score || 0;
+  const issues = q.issues || [];
+
+  // Overall score
+  const color = overall > 0.7 ? '#4caf50' : overall > 0.4 ? '#ff9800' : '#f44336';
+  document.getElementById('overall-score').innerHTML =
+    `<div style="font-size:4rem;font-weight:700;color:${color};">${(overall * 100).toFixed(0)}%</div>
+     <div style="color:#8b95a5;">${issues.length} issues found</div>`;
+
+  // Radar chart
+  const labels = Object.keys(scores).map(k => k.charAt(0).toUpperCase() + k.slice(1));
+  const values = Object.values(scores).map(v => (v * 100));
+  const ctx = document.getElementById('radar-chart');
+  if (radarChart) radarChart.destroy();
+  radarChart = new Chart(ctx, {
+    type: 'radar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Quality %',
+        data: values,
+        backgroundColor: 'rgba(79, 195, 247, 0.2)',
+        borderColor: '#4fc3f7',
+        pointBackgroundColor: '#4fc3f7',
+      }],
+    },
+    options: {
+      responsive: true,
+      scales: { r: { beginAtZero: true, max: 100, ticks: { color: '#666' }, grid: { color: '#2a2d37' }, pointLabels: { color: '#aaa' } } },
+      plugins: { legend: { display: false } },
+    },
+  });
+
+  // Issues list
+  if (!issues.length) {
+    document.getElementById('quality-issues').innerHTML = '<p style="color:#4caf50">No issues detected!</p>';
+    return;
+  }
+  document.getElementById('quality-issues').innerHTML = issues.map(issue => {
+    const typeColor = issue.type.includes('cycle') ? '#f44336' : '#ff9800';
+    return `<div class="alert-item">
+      <span style="color:${typeColor}">⚠ ${issue.type}</span>
+      ${issue.value !== undefined ? ` — ${JSON.stringify(issue.value)}` : ''}
+      ${issue.pair ? ` — ${JSON.stringify(issue.pair)}` : ''}
+      ${issue.jaccard ? ` (Jaccard: ${issue.jaccard})` : ''}
+      <div style="font-size:0.75rem;color:#666;margin-top:2px;">${issue.suggestion || ''}</div>
+    </div>`;
+  }).join('');
 }
 
 // ── Init ──

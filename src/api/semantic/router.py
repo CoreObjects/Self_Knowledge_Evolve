@@ -387,3 +387,12 @@ def stale_knowledge(
         return _wrap(_app.query("stale_knowledge", type=type, days=days, limit=limit))
     except Exception as exc:
         return _err(str(exc))
+
+
+@router.get("/ontology_quality")
+def ontology_quality(_app = Depends(get_app)):
+    """Compute full ontology quality report (5 dimensions, 20 indicators)."""
+    try:
+        return _wrap(_app.query("ontology_quality"))
+    except Exception as exc:
+        return _err(str(exc))

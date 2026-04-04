@@ -42,6 +42,9 @@ METRIC_TO_QUERY: dict[str, tuple[str, dict]] = {
     "alias_conflicts":        ("ontology_inspect",   {"inspect_type": "alias_conflicts"}),
     "inheritance_stats":      ("ontology_inspect",   {"inspect_type": "inheritance_stats"}),
     "relation_candidates":    ("ontology_inspect",   {"inspect_type": "relation_candidates"}),
+
+    # ── Ontology quality (full report) ────────────────────────────
+    "ontology_quality":       ("ontology_quality",   {}),
 }
 
 

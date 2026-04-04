@@ -14,6 +14,7 @@ from src.operators.graph_inspect_op       import GraphInspectOperator
 from src.operators.cross_layer_check_op   import CrossLayerCheckOperator
 from src.operators.ontology_inspect_op    import OntologyInspectOperator
 from src.operators.stale_knowledge_op     import StaleKnowledgeOperator
+from src.operators.ontology_quality_op    import OntologyQualityOperator
 
 ALL_OPERATORS = [
     LookupOperator(),
@@ -35,4 +36,5 @@ ALL_OPERATORS = [
     CrossLayerCheckOperator(),
     OntologyInspectOperator(),
     StaleKnowledgeOperator(),
+    OntologyQualityOperator(),
 ]
