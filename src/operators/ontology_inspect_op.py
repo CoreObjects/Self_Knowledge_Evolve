@@ -10,5 +10,6 @@ class OntologyInspectOperator(SemanticOperator):
             kw["inspect_type"],
             limit=kw.get("limit", 50),
             graph=app.graph,
+            store=app.store,
         )
         return OperatorResult(data=data, ontology_version=app.ontology.version())

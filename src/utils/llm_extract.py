@@ -374,6 +374,81 @@ class LLMExtractor:
         title = raw.strip().rstrip(".")
         return title[:255] if title else None
 
+    def extract_candidate_terms(
+        self,
+        text: str,
+        known_terms: list[str],
+    ) -> list[dict]:
+        """Extract domain terms from text that are NOT in the known ontology.
+
+        Args:
+            text: Raw segment text (preserving original case).
+            known_terms: List of known ontology canonical names / aliases.
+
+        Returns:
+            List of dicts: [{"term": "...", "reason": "..."}]
+            Empty list if LLM disabled or no candidates found.
+        """
+        if not self.is_enabled() or not text.strip():
+            return []
+
+        known_sample = ", ".join(known_terms[:80])
+        system = (
+            "You are a network engineering terminology extractor.\n"
+            "Given a text segment and a list of known ontology concepts, "
+            "identify NEW technical terms that are NOT in the known list "
+            "but SHOULD be added to a networking knowledge base.\n\n"
+            "Return ONLY a JSON array. Each element:\n"
+            '{"term": "<exact surface form>", "reason": "<why this is a domain concept>"}\n\n'
+            "Rules:\n"
+            "- Only return networking/telecom domain-specific terms\n"
+            "- Skip generic words, document structure words, author names, dates\n"
+            "- Include: protocol names, mechanisms, configuration objects, network functions\n"
+            "- Include multi-word terms (e.g. 'route reflector', 'forwarding equivalence class')\n"
+            "- Return [] if no new terms found"
+        )
+        prompt = (
+            f"Known concepts: {known_sample}\n\n"
+            f"Text:\n{text[:2000]}\n\n"
+            "Extract new domain terms as JSON array:"
+        )
+
+        raw = self._call_llm(system, prompt, 512)
+        if raw is None:
+            return []
+
+        return self._parse_candidate_terms(raw)
+
+    def _parse_candidate_terms(self, raw: str) -> list[dict]:
+        """Parse LLM response for candidate terms."""
+        raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.MULTILINE)
+        raw = re.sub(r"\s*```$", "", raw, flags=re.MULTILINE).strip()
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            m = re.search(r"\[.*\]", raw, re.DOTALL)
+            if not m:
+                return []
+            try:
+                data = json.loads(m.group())
+            except json.JSONDecodeError:
+                return []
+
+        if not isinstance(data, list):
+            return []
+
+        results = []
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            term = item.get("term", "").strip()
+            if term and len(term) >= 2:
+                results.append({
+                    "term": term,
+                    "reason": item.get("reason", ""),
+                })
+        return results
+
     def ping(self, timeout: float = 15.0) -> bool:
         """Return True if LLM is reachable when enabled.
 

@@ -142,6 +142,17 @@ def _init_schema() -> None:
             meta_context    TEXT,
             relation_source TEXT
         );
+        CREATE TABLE IF NOT EXISTS relation_candidates (
+            candidate_id    INTEGER PRIMARY KEY AUTOINCREMENT,
+            predicate_name  TEXT NOT NULL,
+            normalized_name TEXT UNIQUE,
+            examples        TEXT DEFAULT '[]',
+            source_count    INTEGER DEFAULT 1,
+            source_diversity REAL DEFAULT 0,
+            review_status   TEXT DEFAULT 'discovered',
+            first_seen_at   TEXT,
+            last_seen_at    TEXT
+        );
         CREATE TABLE IF NOT EXISTS system_stats_snapshots (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
             snapshot        TEXT,

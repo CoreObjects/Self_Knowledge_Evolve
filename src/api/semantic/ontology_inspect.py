@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from semcore.providers.base import GraphStore
+from semcore.providers.base import GraphStore, RelationalStore
 
 log = logging.getLogger(__name__)
 
@@ -14,13 +14,14 @@ def ontology_inspect(
     limit: int = 50,
     *,
     graph: GraphStore,
+    store: RelationalStore | None = None,
 ) -> dict:
     log.debug("ontology_inspect type=%s", inspect_type)
 
     handler = _INSPECT_HANDLERS.get(inspect_type)
     if handler is None:
         return {"error": f"Unknown inspect_type '{inspect_type}'", "valid_types": list(_INSPECT_HANDLERS)}
-    return handler(graph=graph, limit=limit)
+    return handler(graph=graph, store=store, limit=limit)
 
 
 def _inheritance_stats(*, graph: GraphStore, **_kw) -> dict:
@@ -119,9 +120,27 @@ def _alias_conflicts(*, graph: GraphStore, limit: int, **_kw) -> dict:
     return {"inspect_type": "alias_conflicts", "count": len(conflicts), "conflicts": conflicts}
 
 
+def _relation_candidates(*, store: RelationalStore | None, limit: int, **_kw) -> dict:
+    """Candidate relation types discovered by LLM but not in ontology."""
+    if store is None:
+        return {"inspect_type": "relation_candidates", "count": 0, "candidates": []}
+    rows = store.fetchall(
+        """SELECT predicate_name, normalized_name, source_count, review_status,
+                  examples, first_seen_at, last_seen_at
+           FROM governance.relation_candidates
+           ORDER BY source_count DESC
+           LIMIT %s""",
+        (limit,),
+    )
+    candidates = [dict(r) for r in rows]
+    log.info("relation_candidates: %d found", len(candidates))
+    return {"inspect_type": "relation_candidates", "count": len(candidates), "candidates": candidates}
+
+
 _INSPECT_HANDLERS = {
     "inheritance_stats": _inheritance_stats,
     "single_child": _single_child,
     "no_alias": _no_alias,
     "alias_conflicts": _alias_conflicts,
+    "relation_candidates": _relation_candidates,
 }

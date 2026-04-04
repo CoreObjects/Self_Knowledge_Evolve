@@ -131,8 +131,12 @@ class StatsCollector:
 
     def _evolution_status(self) -> dict:
         s = self._store
-        by_status = self._count_grouped(s, "governance.evolution_candidates", "review_status")
-        return {"candidates_by_status": by_status}
+        concept_by_status = self._count_grouped(s, "governance.evolution_candidates", "review_status")
+        relation_by_status = self._count_grouped(s, "governance.relation_candidates", "review_status")
+        return {
+            "concept_candidates": concept_by_status,
+            "relation_candidates": relation_by_status,
+        }
 
     # ── 5. Pipeline health ────────────────────────────────────────
 

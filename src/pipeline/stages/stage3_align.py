@@ -43,10 +43,12 @@ class AlignStage(Stage):
     def __init__(self) -> None:
         self._ontology = None
         self._store: RelationalStore | None = None
+        self._llm = None
 
     def process(self, ctx: PipelineContext, app) -> PipelineContext:  # type: ignore[override]
         self._ontology = app.ontology
         self._store = app.store
+        self._llm = getattr(app, "llm", None)
         self._crawler_store = getattr(app, "crawler_store", None) or app.store
         source_doc_id = ctx.doc.source_doc_id if ctx.doc else ctx.source_doc_id
         self._run(source_doc_id)
@@ -176,20 +178,42 @@ class AlignStage(Stage):
     def _collect_candidates(
         self, text: str, matched_nodes: dict, source_doc_id: str
     ) -> int:
-        """Rule A3: terms that don't match ontology -> candidate pool.
+        """Rule A3: discover terms not in ontology → candidate pool.
 
-        Uses normalized_form as dedup key; accumulates source_count and
-        seen_source_doc_ids across documents.
+        Priority: LLM extraction → regex fallback.
+        Uses normalized_form as dedup key; accumulates source_count.
         """
         from src.utils.normalize import normalize_term
         ontology = self._ontology
+
+        # Priority 1: LLM — understands context, catches multi-word terms
+        unmatched_terms: list[str] = []
+        if self._llm and hasattr(self._llm, "extract_candidate_terms"):
+            known = [n.get("canonical_name", "") for n in ontology.get_all_nodes()]
+            llm_candidates = self._llm.extract_candidate_terms(text, known)
+            for item in llm_candidates:
+                term = item.get("term", "").strip()
+                if term and not ontology.lookup_alias(term.lower()):
+                    unmatched_terms.append(term)
+            if unmatched_terms:
+                log.debug("  LLM discovered %d candidate terms", len(unmatched_terms))
+
+        # Priority 2: Regex fallback — CamelCase / uppercase acronyms
+        if not unmatched_terms:
+            regex_matches = re.findall(r"\b([A-Z][A-Za-z0-9\-]{2,}|[A-Z]{2,10})\b", text)
+            unmatched_terms = [
+                c for c in regex_matches
+                if not ontology.lookup_alias(c.lower())
+            ]
+
+        self._upsert_candidates(unmatched_terms, source_doc_id)
+        return len(set(unmatched_terms))
+
+    def _upsert_candidates(self, terms: list[str], source_doc_id: str) -> None:
+        """Write candidate terms to governance.evolution_candidates."""
+        from src.utils.normalize import normalize_term
         store = self._store
-        candidates = re.findall(r"\b([A-Z][A-Za-z0-9\-]{2,}|[A-Z]{2,10})\b", text)
-        unmatched = [
-            c for c in candidates
-            if not ontology.lookup_alias(c.lower())
-        ]
-        for term in set(unmatched):
+        for term in set(terms):
             normalized = normalize_term(term)
             store.execute(
                 """
@@ -213,7 +237,6 @@ class AlignStage(Stage):
                 """,
                 (term, normalized, source_doc_id, term, term, source_doc_id, source_doc_id),
             )
-        return len(set(unmatched))
 
     def _save_tags(self, segment_id: str, tags: list[dict]) -> int:
         if not tags:
