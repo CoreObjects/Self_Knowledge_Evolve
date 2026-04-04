@@ -193,8 +193,11 @@ class BackfillWorker:
                 WITH f
                 MATCH (a:OntologyNode {{node_id: $subj}})
                 MATCH (b:OntologyNode {{node_id: $obj}})
-                MERGE (a)-[r:{rel_type} {{fact_id: $fact_id}}]->(b)
-                SET r.confidence = $conf, r.predicate = $pred
+                MERGE (a)-[r:{rel_type}]->(b)
+                SET r.predicate = $pred,
+                    r.confidence = CASE WHEN r.confidence IS NULL OR r.confidence < $conf
+                                   THEN $conf ELSE r.confidence END,
+                    r.fact_count = coalesce(r.fact_count, 0) + 1
                 """,
                 fact_id=fact_id, subj=subj, pred=pred, obj=obj, conf=conf,
             )

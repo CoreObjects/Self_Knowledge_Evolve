@@ -191,8 +191,11 @@ class IndexStage(Stage):
                 WITH f
                 MATCH (a:OntologyNode {{node_id: $subject}})
                 MATCH (b:OntologyNode {{node_id: $object}})
-                MERGE (a)-[r:{rel_type} {{fact_id: $fact_id}}]->(b)
-                SET r.confidence = $confidence, r.predicate = $predicate
+                MERGE (a)-[r:{rel_type}]->(b)
+                SET r.predicate = $predicate,
+                    r.confidence = CASE WHEN r.confidence IS NULL OR r.confidence < $confidence
+                                   THEN $confidence ELSE r.confidence END,
+                    r.fact_count = coalesce(r.fact_count, 0) + 1
                 """,
                 fact_id=str(f["fact_id"]),
                 subject=f["subject"],
