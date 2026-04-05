@@ -394,3 +394,11 @@ relations:
   symmetric: false
   transitive: false
   version_introduced: v0.1.13
+- id: attached_to
+  category: evolved
+  description: 'Discovered relation: attached_to'
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+  version_introduced: v0.1.14
