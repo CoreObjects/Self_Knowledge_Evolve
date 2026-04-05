@@ -45,6 +45,19 @@ async def on_startup() -> None:
             "Continuing startup with degraded health (STARTUP_HEALTH_REQUIRED=false)."
         )
 
+    # Start stats scheduler on API startup (not lazily)
+    try:
+        from src.app_factory import get_app
+        from src.stats.collector import StatsCollector
+        from src.stats.scheduler import StatsScheduler
+        _app = get_app()
+        collector = StatsCollector(store=_app.store, graph=_app.graph, crawler_store=_app.crawler_store)
+        scheduler = StatsScheduler(collector, store=_app.store)
+        scheduler.start()
+        log.info("Stats scheduler started (5 min interval)")
+    except Exception as exc:
+        log.warning("Stats scheduler failed to start: %s", exc)
+
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(semantic_router)
