@@ -259,3 +259,20 @@ nodes:
   aliases:
   - advertising router
   allowed_relations: []
+- id: IP.PE_ROUTER
+  canonical_name: PE router
+  display_name_zh: ''
+  parent_id: IP.L3_ROUTING
+  knowledge_layer: concept
+  maturity_level: evolved
+  lifecycle_state: active
+  version_introduced: v0.1.38
+  description: ''
+  aliases:
+  - pe routers
+  - PE router
+  - pe
+  - PE routers
+  - PE
+  - pe router
+  allowed_relations: []

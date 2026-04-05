@@ -859,3 +859,39 @@ aliases:
   language: en
   confidence: 0.9
   version_introduced: v0.1.37
+- surface_form: pe routers
+  canonical_node_id: IP.PE_ROUTER
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.38
+- surface_form: PE router
+  canonical_node_id: IP.PE_ROUTER
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.38
+- surface_form: pe
+  canonical_node_id: IP.PE_ROUTER
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.38
+- surface_form: PE routers
+  canonical_node_id: IP.PE_ROUTER
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.38
+- surface_form: PE
+  canonical_node_id: IP.PE_ROUTER
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.38
+- surface_form: pe router
+  canonical_node_id: IP.PE_ROUTER
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.38
