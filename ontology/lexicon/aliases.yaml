@@ -925,3 +925,15 @@ aliases:
   language: en
   confidence: 0.9
   version_introduced: v0.1.40
+- surface_form: MOSPF
+  canonical_node_id: IP.MOSPF
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.41
+- surface_form: mospf
+  canonical_node_id: IP.MOSPF
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.41

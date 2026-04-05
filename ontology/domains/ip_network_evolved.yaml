@@ -303,3 +303,16 @@ nodes:
   - link state database
   - link-state database
   allowed_relations: []
+- id: IP.MOSPF
+  canonical_name: mospf
+  display_name_zh: ''
+  parent_id: IP.L3_ROUTING
+  knowledge_layer: concept
+  maturity_level: evolved
+  lifecycle_state: active
+  version_introduced: v0.1.41
+  description: ''
+  aliases:
+  - MOSPF
+  - mospf
+  allowed_relations: []
