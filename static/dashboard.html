@@ -473,13 +473,68 @@ async function loadReviewList() {
           <div class="meta">Surface forms: ${(c.surface_forms || []).join(', ')}</div>
           ${examples}
           <div class="review-actions">
+            <button class="btn" style="background:#2196f3;color:#fff;" onclick="showCandidateContext('${c.candidate_id}')">View Sources</button>
             <button class="btn btn-approve" onclick="approveCandidate('${c.candidate_id}', '${c.candidate_type}')">Approve</button>
             <button class="btn btn-reject" onclick="rejectCandidate('${c.candidate_id}')">Reject</button>
           </div>
+          <div id="ctx-${c.candidate_id}" style="display:none;margin-top:10px;"></div>
         </div>`;
     }).join('');
   } catch (e) {
     container.innerHTML = `<p>Error: ${e.message}</p>`;
+  }
+}
+
+async function showCandidateContext(id) {
+  const container = document.getElementById(`ctx-${id}`);
+  if (container.style.display === 'block') {
+    container.style.display = 'none';
+    return;
+  }
+  container.innerHTML = '<p class="loading">Loading related documents...</p>';
+  container.style.display = 'block';
+
+  try {
+    const res = await fetch(`${API}/review/${id}`);
+    const data = await res.json();
+    const ctx = data.related_context || {};
+    const segments = ctx.segments || [];
+    const evidence = ctx.evidence || [];
+
+    if (!segments.length && !evidence.length) {
+      container.innerHTML = '<p style="color:#8b95a5;font-size:0.8rem;">No related documents found.</p>';
+      return;
+    }
+
+    let html = '';
+
+    if (evidence.length) {
+      html += '<div style="font-size:0.8rem;color:#8b95a5;margin-bottom:6px;font-weight:600;">Evidence provenance:</div>';
+      html += evidence.map(e =>
+        `<div style="font-size:0.78rem;padding:4px 0;border-bottom:1px solid #2a2d37;">
+          <span style="color:#4fc3f7;">[${e.source_rank}]</span> ${e.doc_title || e.url || 'unknown'}
+          <span style="color:#666;"> — ${e.fact} (${e.extraction_method}, conf=${e.confidence.toFixed(2)})</span>
+        </div>`
+      ).join('');
+    }
+
+    if (segments.length) {
+      html += `<div style="font-size:0.8rem;color:#8b95a5;margin:8px 0 6px;font-weight:600;">
+        Related segments (${segments.length}, ${ctx.stats?.total_tokens || 0} tokens):</div>`;
+      html += segments.slice(0, 5).map(s =>
+        `<div style="font-size:0.78rem;padding:6px;margin-bottom:6px;background:#151820;border-radius:4px;border-left:3px solid #2196f3;">
+          <div style="color:#8b95a5;margin-bottom:3px;">[${s.segment_type}] ${s.source.doc_title} <span style="color:#555;">[${s.source.rank}]</span></div>
+          <div style="color:#ccc;white-space:pre-wrap;max-height:200px;overflow-y:auto;">${s.text.substring(0, 600)}${s.text.length > 600 ? '...' : ''}</div>
+        </div>`
+      ).join('');
+      if (segments.length > 5) {
+        html += `<div style="font-size:0.75rem;color:#666;">... and ${segments.length - 5} more segments</div>`;
+      }
+    }
+
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = `<p style="color:#f44336;font-size:0.8rem;">Error: ${e.message}</p>`;
   }
 }
 

@@ -124,8 +124,19 @@ def list_review(
 
 @router.get("/review/{candidate_id}")
 def get_review(candidate_id: str, _app=Depends(get_app)):
-    """Get single candidate details."""
-    return _review.get_candidate(candidate_id, store=_app.store)
+    """Get single candidate details + related segments via context_assemble."""
+    candidate = _review.get_candidate(candidate_id, store=_app.store)
+    if candidate.get("error"):
+        return candidate
+
+    # Use context_assemble to retrieve related segments and evidence
+    surface_forms = candidate.get("surface_forms") or []
+    normalized = candidate.get("normalized_form") or ""
+    keywords = [normalized] + [sf for sf in surface_forms if sf != normalized]
+
+    context = _app.query("context_assemble", keywords=keywords[:5], max_segments=10).data
+    candidate["related_context"] = context
+    return candidate
 
 
 @router.post("/review/{candidate_id}/approve")
