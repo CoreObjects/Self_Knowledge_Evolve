@@ -152,3 +152,16 @@ nodes:
   aliases:
   - point-to-point network
   allowed_relations: []
+- id: IP.FORWARDING_TABLE
+  canonical_name: forwarding table
+  display_name_zh: ''
+  parent_id: IP.LABEL
+  knowledge_layer: concept
+  maturity_level: evolved
+  lifecycle_state: active
+  version_introduced: v0.1.27
+  description: A forwarding table is a data structure used by network devices to determine
+    the optimal path for forwarding data packets toward their destination.
+  aliases:
+  - forwarding table
+  allowed_relations: []

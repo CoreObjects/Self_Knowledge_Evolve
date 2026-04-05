@@ -751,3 +751,9 @@ aliases:
   language: en
   confidence: 0.9
   version_introduced: v0.1.26
+- surface_form: forwarding table
+  canonical_node_id: IP.FORWARDING_TABLE
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.27
