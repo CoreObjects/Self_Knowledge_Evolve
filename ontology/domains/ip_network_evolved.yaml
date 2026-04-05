@@ -1,0 +1,19 @@
+version: v0.1.6
+domain: IP / Data Communication Network (Evolved)
+domain_id: IP
+nodes:
+- id: IP.SD_WAN
+  canonical_name: SD-WAN
+  display_name_zh: ''
+  parent_id: IP.VPN_OVERLAY
+  knowledge_layer: concept
+  maturity_level: evolved
+  lifecycle_state: active
+  version_introduced: v0.1.6
+  description: SD-WAN is a software-defined wide area network that optimizes connectivity
+    between enterprise sites and clouds by intelligently routing traffic across multiple
+    link types for improved reliability and performance.
+  aliases:
+  - SD-WAN
+  - sd-wan
+  allowed_relations: []

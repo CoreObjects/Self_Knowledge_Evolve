@@ -661,3 +661,15 @@ aliases:
   language: en
   confidence: 0.9
   version_introduced: v0.1.4
+- surface_form: SD-WAN
+  canonical_node_id: IP.SD_WAN
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.6
+- surface_form: sd-wan
+  canonical_node_id: IP.SD_WAN
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.6
