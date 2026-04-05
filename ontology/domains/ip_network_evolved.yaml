@@ -194,3 +194,16 @@ nodes:
   - router lsa
   - router-LSA
   allowed_relations: []
+- id: IP.LINK_STATE_ID
+  canonical_name: link state id
+  display_name_zh: ''
+  parent_id: IP.TELEMETRY
+  knowledge_layer: concept
+  maturity_level: evolved
+  lifecycle_state: active
+  version_introduced: v0.1.33
+  description: ''
+  aliases:
+  - link state id
+  - link-state id
+  allowed_relations: []

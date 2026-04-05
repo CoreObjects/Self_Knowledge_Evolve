@@ -799,3 +799,15 @@ aliases:
   language: en
   confidence: 0.9
   version_introduced: v0.1.32
+- surface_form: link state id
+  canonical_node_id: IP.LINK_STATE_ID
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.33
+- surface_form: link-state id
+  canonical_node_id: IP.LINK_STATE_ID
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.33
