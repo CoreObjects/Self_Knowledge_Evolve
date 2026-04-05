@@ -40,7 +40,7 @@ def list_candidates(
                    candidate_parent_id, first_seen_at, last_seen_at
             FROM governance.evolution_candidates
             {where_clause}
-            ORDER BY composite_score DESC, source_count DESC
+            ORDER BY source_count DESC, composite_score DESC
             LIMIT %s""",
         (*params, limit),
     )

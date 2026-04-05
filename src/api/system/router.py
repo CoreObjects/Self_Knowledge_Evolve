@@ -115,7 +115,7 @@ class RejectRequest(BaseModel):
 def list_review(
     type: str = Query("all", description="concept|relation|all"),
     status: str = Query("pending_review", description="pending_review|discovered|all"),
-    limit: int = Query(20),
+    limit: int = Query(100),
     _app=Depends(get_app),
 ):
     """List candidates for review."""

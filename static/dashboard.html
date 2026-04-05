@@ -453,7 +453,7 @@ async function loadReviewList() {
   container.innerHTML = '<p class="loading">Loading...</p>';
 
   try {
-    const res = await fetch(`${API}/review?type=${type}&status=${status}&limit=50`);
+    const res = await fetch(`${API}/review?type=${type}&status=${status}&limit=100`);
     const data = await res.json();
     const candidates = data.candidates || [];
 
