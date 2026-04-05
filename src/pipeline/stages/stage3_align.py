@@ -184,7 +184,7 @@ class AlignStage(Stage):
         # Priority 1: LLM — understands context, catches multi-word terms
         unmatched_terms: list[str] = []
         if self._llm and hasattr(self._llm, "extract_candidate_terms"):
-            known = [n.get("canonical_name", "") for n in ontology.get_all_nodes()]
+            known = [n.label for n in ontology.get_all_nodes() if n.label]
             llm_candidates = self._llm.extract_candidate_terms(text, known)
             for item in llm_candidates:
                 term = item.get("term", "").strip()
