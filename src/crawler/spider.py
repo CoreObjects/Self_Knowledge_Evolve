@@ -251,10 +251,18 @@ class Spider:
                 raw_uri,
                 len(html_bytes),
             )
+            # Discover new links from this page
+            discovered = self._discover_links(
+                result["html"], result.get("final_url") or url, task["site_key"],
+            )
+            if discovered:
+                log.info("Discovered %d new URLs from %s", discovered, url)
+
             return {
                 "task_id": task_id, "status": "done",
                 "url": result["final_url"], "raw_uri": raw_uri,
                 "source_doc_id": source_doc_id,
+                "links_discovered": discovered,
             }
 
         except Exception as exc:
@@ -295,6 +303,89 @@ class Spider:
         except Exception as exc:
             log.error("Failed to create document for task %s: %s", task["id"], exc)
             return None
+
+    def _discover_links(self, html: str, base_url: str, site_key: str) -> int:
+        """Extract same-site links from HTML and enqueue as new crawl tasks.
+
+        Only follows links that:
+        - Are on the same hostname as base_url
+        - Match scope_rules (if defined) for this site_key
+        - Haven't been crawled before (ON CONFLICT DO NOTHING)
+        - Look like content pages (not images, css, js, anchors)
+        """
+        import re as _re
+        from urllib.parse import urljoin, urlparse
+
+        parsed_base = urlparse(base_url)
+        base_host = parsed_base.netloc
+
+        # Extract href values from <a> tags
+        hrefs = _re.findall(r'<a[^>]+href=["\']([^"\'#]+)', html, _re.I)
+        if not hrefs:
+            return 0
+
+        # Load scope rules for this site
+        scope_row = self._store.fetchone(
+            "SELECT scope_rules FROM source_registry WHERE site_key = %s",
+            (site_key,),
+        )
+        scope_rules = scope_row.get("scope_rules") if scope_row else None
+        allow_patterns = []
+        deny_patterns = []
+        if scope_rules and isinstance(scope_rules, dict):
+            for pattern in scope_rules.get("allow", []):
+                try:
+                    allow_patterns.append(_re.compile(pattern))
+                except _re.error:
+                    pass
+            for pattern in scope_rules.get("deny", []):
+                try:
+                    deny_patterns.append(_re.compile(pattern))
+                except _re.error:
+                    pass
+
+        # Filter for non-content extensions
+        _SKIP_EXT = {'.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico',
+                     '.pdf', '.zip', '.tar', '.gz', '.mp4', '.mp3', '.woff', '.woff2', '.ttf'}
+
+        enqueued = 0
+        for href in hrefs:
+            full_url = urljoin(base_url, href)
+            parsed = urlparse(full_url)
+
+            # Same host only
+            if parsed.netloc != base_host:
+                continue
+
+            # Skip non-content
+            path_lower = parsed.path.lower()
+            if any(path_lower.endswith(ext) for ext in _SKIP_EXT):
+                continue
+
+            # Normalize: strip fragment, keep query
+            clean_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+            if parsed.query:
+                clean_url += f"?{parsed.query}"
+
+            # Apply scope rules
+            if allow_patterns and not any(p.search(clean_url) for p in allow_patterns):
+                continue
+            if deny_patterns and any(p.search(clean_url) for p in deny_patterns):
+                continue
+
+            # Enqueue (dedup via UNIQUE on url)
+            try:
+                self._store.execute(
+                    """INSERT INTO crawl_tasks (site_key, url, task_type, priority, status, scheduled_at)
+                       VALUES (%s, %s, 'discovered', 3, 'pending', NOW())
+                       ON CONFLICT (url) DO NOTHING""",
+                    (site_key, clean_url),
+                )
+                enqueued += 1
+            except Exception:
+                pass
+
+        return enqueued
 
     def _respect_rate_limit(self, site_key: str, rps: float = 1.0) -> None:
         last = self._last_request_time.get(site_key, 0.0)
