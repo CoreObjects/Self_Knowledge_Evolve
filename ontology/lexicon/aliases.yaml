@@ -835,3 +835,21 @@ aliases:
   language: en
   confidence: 0.9
   version_introduced: v0.1.35
+- surface_form: as-external-LSAs
+  canonical_node_id: IP.AS_EXTERNAL_LSAS
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.36
+- surface_form: AS-external-LSAs
+  canonical_node_id: IP.AS_EXTERNAL_LSAS
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.36
+- surface_form: as-external-lsas
+  canonical_node_id: IP.AS_EXTERNAL_LSAS
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.36
