@@ -193,6 +193,12 @@ h2 { font-size: 1.1rem; margin: 16px 0 8px; color: #8b95a5; }
       <option value="all">All Status</option>
     </select>
   </div>
+  <div id="merge-bar" style="display:none;margin-bottom:10px;padding:8px;background:#252830;border-radius:6px;">
+    <span id="merge-count">0</span> selected —
+    <button class="btn" style="background:#ff9800;color:#fff;" onclick="checkSynonymsSelected()">Ask LLM</button>
+    <button class="btn btn-approve" onclick="mergeSelected()">Merge</button>
+    <span id="merge-result" style="margin-left:10px;font-size:0.8rem;color:#8b95a5;"></span>
+  </div>
   <div id="review-list"><p class="loading">Loading...</p></div>
 </div>
 
@@ -465,6 +471,7 @@ async function loadReviewList() {
         : '';
       return `
         <div class="review-card" id="card-${c.candidate_id}">
+          <label style="float:right;cursor:pointer;"><input type="checkbox" class="merge-check" value="${c.candidate_id}" onchange="updateMergeBar()"> select</label>
           <div class="term">${(c.surface_forms && c.surface_forms[0]) || c.normalized_form || '?'}${typeBadge}</div>
           <div class="meta">
             Sources: ${c.source_count || 0} · Score: ${(c.composite_score || 0).toFixed(2)}
@@ -520,6 +527,61 @@ async function showCandidateContext(id) {
     container.innerHTML = html;
   } catch (e) {
     container.innerHTML = `<p style="color:#f44336;font-size:0.8rem;">Error: ${e.message}</p>`;
+  }
+}
+
+function getSelectedIds() {
+  return [...document.querySelectorAll('.merge-check:checked')].map(cb => cb.value);
+}
+
+function updateMergeBar() {
+  const ids = getSelectedIds();
+  const bar = document.getElementById('merge-bar');
+  bar.style.display = ids.length >= 2 ? 'block' : 'none';
+  document.getElementById('merge-count').textContent = ids.length;
+  document.getElementById('merge-result').textContent = '';
+}
+
+async function checkSynonymsSelected() {
+  const ids = getSelectedIds();
+  if (ids.length < 2) return;
+  document.getElementById('merge-result').textContent = 'Asking LLM...';
+  try {
+    const res = await fetch(`${API}/review/check_synonyms`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({candidate_ids: ids}),
+    });
+    const data = await res.json();
+    if (data.is_synonym !== undefined) {
+      const icon = data.is_synonym ? '🟢 Yes' : '🔴 No';
+      document.getElementById('merge-result').innerHTML =
+        `${icon} — suggested: <strong>${data.suggested_canonical || '?'}</strong> — ${data.reason || ''}`;
+    } else {
+      document.getElementById('merge-result').textContent = data.raw_response || data.error || 'No result';
+    }
+  } catch (e) {
+    document.getElementById('merge-result').textContent = `Error: ${e.message}`;
+  }
+}
+
+async function mergeSelected() {
+  const ids = getSelectedIds();
+  if (ids.length < 2) return;
+  if (!confirm(`Merge ${ids.length} candidates into one?`)) return;
+  try {
+    const res = await fetch(`${API}/review/merge`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({candidate_ids: ids}),
+    });
+    const data = await res.json();
+    if (data.status === 'merged') {
+      alert(`Merged into ${data.surface_forms.join(', ')}`);
+      loadReviewList();
+    } else {
+      alert(data.error || 'Merge failed');
+    }
+  } catch (e) {
+    alert(`Error: ${e.message}`);
   }
 }
 

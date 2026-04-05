@@ -155,6 +155,128 @@ def reject_candidate(
     return {"status": "rejected", "candidate_id": candidate_id}
 
 
+def merge_candidates(
+    candidate_ids: list[str],
+    primary_id: str | None = None,
+    *,
+    store: RelationalStore,
+) -> dict:
+    """Merge multiple candidates into one. First or primary_id becomes the survivor."""
+    if len(candidate_ids) < 2:
+        return {"error": "Need at least 2 candidate IDs to merge"}
+
+    candidates = []
+    for cid in candidate_ids:
+        row = store.fetchone(
+            "SELECT * FROM governance.evolution_candidates WHERE candidate_id = %s",
+            (cid,),
+        )
+        if row:
+            candidates.append(row)
+
+    if len(candidates) < 2:
+        return {"error": "Could not find enough candidates to merge"}
+
+    # Pick primary: explicit or first
+    primary = None
+    others = []
+    for c in candidates:
+        if primary_id and str(c["candidate_id"]) == primary_id:
+            primary = c
+        else:
+            others.append(c)
+    if primary is None:
+        primary = candidates[0]
+        others = candidates[1:]
+
+    # Merge surface_forms, examples, source_count, seen_source_doc_ids
+    merged_forms = list(primary.get("surface_forms") or [])
+    merged_examples = list(primary.get("examples") or [])
+    merged_count = int(primary.get("source_count") or 0)
+
+    for other in others:
+        for sf in (other.get("surface_forms") or []):
+            if sf not in merged_forms:
+                merged_forms.append(sf)
+        other_examples = other.get("examples") or []
+        if isinstance(other_examples, str):
+            other_examples = json.loads(other_examples)
+        merged_examples.extend(other_examples)
+        merged_count += int(other.get("source_count") or 0)
+
+    # Update primary
+    store.execute(
+        """UPDATE governance.evolution_candidates
+           SET surface_forms = %s, examples = %s::jsonb, source_count = %s
+           WHERE candidate_id = %s""",
+        (merged_forms, json.dumps(merged_examples), merged_count, primary["candidate_id"]),
+    )
+
+    # Delete others
+    for other in others:
+        store.execute(
+            "DELETE FROM governance.evolution_candidates WHERE candidate_id = %s",
+            (other["candidate_id"],),
+        )
+
+    log.info("Merged %d candidates into %s (forms=%s)",
+             len(candidates), primary["candidate_id"], merged_forms)
+    return {
+        "status": "merged",
+        "primary_id": str(primary["candidate_id"]),
+        "merged_count": len(candidates),
+        "surface_forms": merged_forms,
+    }
+
+
+def check_synonyms(
+    candidate_ids: list[str],
+    *,
+    store: RelationalStore,
+) -> dict:
+    """Ask LLM whether candidates are synonyms."""
+    candidates = []
+    for cid in candidate_ids:
+        row = store.fetchone(
+            "SELECT normalized_form, surface_forms FROM governance.evolution_candidates WHERE candidate_id = %s",
+            (cid,),
+        )
+        if row:
+            candidates.append(row)
+
+    if len(candidates) < 2:
+        return {"error": "Need at least 2 candidates"}
+
+    terms = [c.get("surface_forms", [c.get("normalized_form")])[0] for c in candidates]
+
+    try:
+        from src.utils.llm_extract import LLMExtractor
+        llm = LLMExtractor()
+        if not llm.is_enabled():
+            return {"error": "LLM not enabled"}
+
+        system = (
+            "You are a networking terminology expert. Determine if the following terms "
+            "refer to the same concept. Return ONLY a JSON object:\n"
+            '{"is_synonym": true/false, "suggested_canonical": "<best name>", '
+            '"reason": "<brief explanation>"}'
+        )
+        prompt = f"Terms: {', '.join(terms)}\n\nAre these synonyms?"
+        raw = llm._call_llm(system, prompt, 128)
+        if raw:
+            import json as _json
+            try:
+                result = _json.loads(raw)
+                result["terms"] = terms
+                return result
+            except Exception:
+                return {"terms": terms, "raw_response": raw}
+    except Exception as exc:
+        return {"error": str(exc)}
+
+    return {"terms": terms, "error": "LLM call failed"}
+
+
 # ── Internal ─────────────────────────────────────────────────────────────────
 
 def _approve_concept(

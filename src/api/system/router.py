@@ -185,3 +185,25 @@ def reject(candidate_id: str, body: RejectRequest, _app=Depends(get_app)):
     return _review.reject_candidate(
         candidate_id, reviewer=body.reviewer, note=body.note, store=_app.store,
     )
+
+
+class MergeRequest(BaseModel):
+    candidate_ids: list[str]
+    primary_id: str | None = None
+
+class CheckSynonymsRequest(BaseModel):
+    candidate_ids: list[str]
+
+
+@router.post("/review/merge")
+def merge(body: MergeRequest, _app=Depends(get_app)):
+    """Merge multiple candidates into one."""
+    return _review.merge_candidates(
+        body.candidate_ids, primary_id=body.primary_id, store=_app.store,
+    )
+
+
+@router.post("/review/check_synonyms")
+def check_synonyms(body: CheckSynonymsRequest, _app=Depends(get_app)):
+    """Ask LLM if candidates are synonyms."""
+    return _review.check_synonyms(body.candidate_ids, store=_app.store)

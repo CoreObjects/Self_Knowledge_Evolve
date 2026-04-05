@@ -211,19 +211,29 @@ class AlignStage(Stage):
         """Write candidate terms to governance.evolution_candidates.
 
         Records segment_id + source_doc_id in examples JSONB for traceability.
+        Extracts parenthetical abbreviations as extra surface_forms.
         """
         import json
-        from src.utils.normalize import normalize_term
+        from src.utils.normalize import normalize_term, extract_abbreviation
         store = self._store
         for term in set(terms):
             normalized = normalize_term(term)
+            # Extract abbreviation if present: "xxx (YYY)" → also add "YYY" as surface_form
+            abbrev = extract_abbreviation(term)
+            # Clean the term (strip parenthetical for primary surface_form)
+            clean_term = re.sub(r"\s*\([^)]*\)\s*", "", term).strip() or term
+            # Build initial surface_forms array
+            initial_forms = [clean_term]
+            if abbrev and abbrev != clean_term:
+                initial_forms.append(abbrev)
+
             example = json.dumps([{"segment_id": segment_id, "source_doc_id": source_doc_id}])
             store.execute(
                 """
                 INSERT INTO governance.evolution_candidates
                     (surface_forms, normalized_form, source_count, last_seen_at,
                      first_seen_at, seen_source_doc_ids, review_status, examples)
-                VALUES (ARRAY[%s], %s, 1, NOW(), NOW(), ARRAY[%s::uuid], 'discovered', %s::jsonb)
+                VALUES (%s, %s, 1, NOW(), NOW(), ARRAY[%s::uuid], 'discovered', %s::jsonb)
                 ON CONFLICT (normalized_form) DO UPDATE SET
                     source_count = governance.evolution_candidates.source_count + 1,
                     last_seen_at = NOW(),
@@ -239,8 +249,8 @@ class AlignStage(Stage):
                     END,
                     examples = governance.evolution_candidates.examples || %s::jsonb
                 """,
-                (term, normalized, source_doc_id, example,
-                 term, term, source_doc_id, source_doc_id, example),
+                (initial_forms, normalized, source_doc_id, example,
+                 clean_term, clean_term, source_doc_id, source_doc_id, example),
             )
 
     def _save_tags(self, segment_id: str, tags: list[dict]) -> int:
