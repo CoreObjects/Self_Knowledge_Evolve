@@ -1,441 +1,388 @@
 version: v0.1.0
 relations:
-
-  # ── Classification ─────────────────────────────────────────
-  - id: is_a
-    category: classification
-    description: Inheritance or classification relationship
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: true
-
-  - id: subclass_of
-    category: classification
-    description: Subclass relationship between ontology nodes
-    domain_hint: OntologyNode
-    range_hint: OntologyNode
-    symmetric: false
-    transitive: true
-
-  - id: instance_of
-    category: classification
-    description: Instance membership in a class
-    domain_hint: Entity
-    range_hint: OntologyNode
-    symmetric: false
-    transitive: false
-
-  - id: part_of
-    category: classification
-    description: Compositional membership
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: true
-
-  - id: belongs_to_domain
-    category: classification
-    description: Concept belongs to a network domain
-    domain_hint: Concept
-    range_hint: OntologyNode
-    symmetric: false
-    transitive: false
-
-  # ── Structural ─────────────────────────────────────────────
-  - id: contains
-    category: structural
-    description: Container-contained relationship
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: true
-
-  - id: connected_to
-    category: structural
-    description: Physical or logical link between objects
-    domain_hint: any
-    range_hint: any
-    symmetric: true
-    transitive: false
-
-  - id: hosted_on
-    category: structural
-    description: Software/function hosted on hardware or platform
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  - id: mounted_on
-    category: structural
-    description: Physical installation relationship
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  - id: peers_with
-    category: structural
-    description: Peer relationship (e.g., BGP peers, LACP peers)
-    domain_hint: any
-    range_hint: any
-    symmetric: true
-    transitive: false
-
-  - id: terminates_on
-    category: structural
-    description: Protocol or path terminates on a node
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  # ── Functional ─────────────────────────────────────────────
-  - id: uses_protocol
-    category: functional
-    description: Uses a protocol as its control or data plane
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  - id: implements
-    category: functional
-    description: Implements a standard or specification
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  - id: establishes
-    category: functional
-    description: Establishes a session, adjacency, or tunnel
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  - id: advertises
-    category: functional
-    description: Advertises routing or reachability information
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  - id: learns
-    category: functional
-    description: Learns routing or topology information
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  - id: encapsulates
-    category: functional
-    description: Wraps payload in a header or tunnel
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  - id: forwards_via
-    category: functional
-    description: Forwards traffic via a path, tunnel, or mechanism
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  - id: synchronizes_with
-    category: functional
-    description: Clock or state synchronization relationship
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  - id: authenticates
-    category: functional
-    description: Performs authentication of a peer or user
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  - id: protects
-    category: functional
-    description: Provides redundancy or protection for another object
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  # ── Dependency ─────────────────────────────────────────────
-  - id: depends_on
-    category: dependency
-    description: Functional dependency; target must exist for source to work
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: true
-
-  - id: requires
-    category: dependency
-    description: Mandatory prerequisite condition
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  - id: precedes
-    category: dependency
-    description: Must occur before target in a sequence
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: true
-
-  - id: conflicts_with
-    category: dependency
-    description: Mutually exclusive; cannot coexist
-    domain_hint: any
-    range_hint: any
-    symmetric: true
-    transitive: false
-
-  - id: constrained_by
-    category: dependency
-    description: Behaviour constrained by a rule or policy
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  - id: inherits_policy_from
-    category: dependency
-    description: Inherits configuration or policy from parent object
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: true
-
-  # ── Operations ─────────────────────────────────────────────
-  - id: raises_alarm
-    category: operations
-    description: Condition that triggers an alarm
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  - id: impacts
-    category: operations
-    description: Failure or change propagates impact to target
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: true
-
-  - id: causes
-    category: operations
-    description: Root cause relationship
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: true
-
-  - id: correlated_with
-    category: operations
-    description: Alarms or events that frequently co-occur
-    domain_hint: any
-    range_hint: any
-    symmetric: true
-    transitive: false
-
-  - id: mitigated_by
-    category: operations
-    description: Fault or risk is reduced by a recovery action
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  - id: monitored_by
-    category: operations
-    description: Object is observed by a management system
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  - id: configured_by
-    category: operations
-    description: Object is configured by a tool, protocol, or person
-    domain_hint: any
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  # ── Evidence ───────────────────────────────────────────────
-  - id: supported_by
-    category: evidence
-    description: Claim is backed by an evidence source
-    domain_hint: Fact
-    range_hint: Evidence
-    symmetric: false
-    transitive: false
-
-  - id: derived_from
-    category: evidence
-    description: Knowledge object extracted from a source segment
-    domain_hint: any
-    range_hint: KnowledgeSegment
-    symmetric: false
-    transitive: false
-
-  - id: mentioned_in
-    category: evidence
-    description: Concept is mentioned in a document
-    domain_hint: any
-    range_hint: SourceDocument
-    symmetric: false
-    transitive: false
-
-  - id: contradicted_by
-    category: evidence
-    description: Claim is contradicted by another source
-    domain_hint: Fact
-    range_hint: Fact
-    symmetric: false
-    transitive: false
-
-  # ── Cross-layer (Five-layer semantic structure) ─────────────
-  - id: participates_in
-    category: cross_layer
-    description: Concept participates in a mechanism
-    domain_hint: ConceptNode
-    range_hint: MechanismNode
-    symmetric: false
-    transitive: false
-
-  - id: explains
-    category: cross_layer
-    description: Mechanism explains the behaviour of a concept
-    domain_hint: MechanismNode
-    range_hint: ConceptNode
-    symmetric: false
-    transitive: false
-
-  - id: implemented_by
-    category: cross_layer
-    description: Mechanism is implemented by a method
-    domain_hint: MechanismNode
-    range_hint: MethodNode
-    symmetric: false
-    transitive: false
-
-  - id: operates_on
-    category: cross_layer
-    description: Method operates on a concept object
-    domain_hint: MethodNode
-    range_hint: ConceptNode
-    symmetric: false
-    transitive: false
-
-  - id: produces
-    category: cross_layer
-    description: Method produces a state or object
-    domain_hint: MethodNode
-    range_hint: ConceptNode
-    symmetric: false
-    transitive: false
-
-  - id: governed_by
-    category: cross_layer
-    description: Method is governed by a condition rule
-    domain_hint: MethodNode
-    range_hint: ConditionRuleNode
-    symmetric: false
-    transitive: false
-
-  - id: applies_to
-    category: cross_layer
-    description: Condition rule constrains a concept or method
-    domain_hint: ConditionRuleNode
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  - id: contraindicates
-    category: cross_layer
-    description: Condition rule makes a method or scenario inadvisable
-    domain_hint: ConditionRuleNode
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  - id: selects
-    category: cross_layer
-    description: Condition rule selects a method or scenario
-    domain_hint: ConditionRuleNode
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  - id: preferred_under
-    category: cross_layer
-    description: Method or scenario is preferred under a condition
-    domain_hint: any
-    range_hint: ConditionRuleNode
-    symmetric: false
-    transitive: false
-
-  - id: risky_under
-    category: cross_layer
-    description: Method or scenario carries risk under a condition
-    domain_hint: any
-    range_hint: ConditionRuleNode
-    symmetric: false
-    transitive: false
-
-  - id: composed_of
-    category: cross_layer
-    description: Scenario is composed of concepts, mechanisms, and methods
-    domain_hint: ScenarioPatternNode
-    range_hint: any
-    symmetric: false
-    transitive: false
-
-  - id: validated_by
-    category: cross_layer
-    description: Scenario or method is validated by a verification method
-    domain_hint: any
-    range_hint: MethodNode
-    symmetric: false
-    transitive: false
-
-  - id: instantiated_as
-    category: cross_layer
-    description: Scenario pattern is instantiated as a concrete case
-    domain_hint: ScenarioPatternNode
-    range_hint: CaseNode
-    symmetric: false
-    transitive: false
-
-  - id: applicable_when
-    category: cross_layer
-    description: Condition scopes where a scenario or method applies
-    domain_hint: any
-    range_hint: ConditionRuleNode
-    symmetric: false
-    transitive: false
-
-  - id: risks
-    category: cross_layer
-    description: Condition layer identifies risks for a scenario
-    domain_hint: ConditionRuleNode
-    range_hint: ScenarioPatternNode
-    symmetric: false
-    transitive: false
+- id: is_a
+  category: classification
+  description: Inheritance or classification relationship
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: true
+- id: subclass_of
+  category: classification
+  description: Subclass relationship between ontology nodes
+  domain_hint: OntologyNode
+  range_hint: OntologyNode
+  symmetric: false
+  transitive: true
+- id: instance_of
+  category: classification
+  description: Instance membership in a class
+  domain_hint: Entity
+  range_hint: OntologyNode
+  symmetric: false
+  transitive: false
+- id: part_of
+  category: classification
+  description: Compositional membership
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: true
+- id: belongs_to_domain
+  category: classification
+  description: Concept belongs to a network domain
+  domain_hint: Concept
+  range_hint: OntologyNode
+  symmetric: false
+  transitive: false
+- id: contains
+  category: structural
+  description: Container-contained relationship
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: true
+- id: connected_to
+  category: structural
+  description: Physical or logical link between objects
+  domain_hint: any
+  range_hint: any
+  symmetric: true
+  transitive: false
+- id: hosted_on
+  category: structural
+  description: Software/function hosted on hardware or platform
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: mounted_on
+  category: structural
+  description: Physical installation relationship
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: peers_with
+  category: structural
+  description: Peer relationship (e.g., BGP peers, LACP peers)
+  domain_hint: any
+  range_hint: any
+  symmetric: true
+  transitive: false
+- id: terminates_on
+  category: structural
+  description: Protocol or path terminates on a node
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: uses_protocol
+  category: functional
+  description: Uses a protocol as its control or data plane
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: implements
+  category: functional
+  description: Implements a standard or specification
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: establishes
+  category: functional
+  description: Establishes a session, adjacency, or tunnel
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: advertises
+  category: functional
+  description: Advertises routing or reachability information
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: learns
+  category: functional
+  description: Learns routing or topology information
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: encapsulates
+  category: functional
+  description: Wraps payload in a header or tunnel
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: forwards_via
+  category: functional
+  description: Forwards traffic via a path, tunnel, or mechanism
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: synchronizes_with
+  category: functional
+  description: Clock or state synchronization relationship
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: authenticates
+  category: functional
+  description: Performs authentication of a peer or user
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: protects
+  category: functional
+  description: Provides redundancy or protection for another object
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: depends_on
+  category: dependency
+  description: Functional dependency; target must exist for source to work
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: true
+- id: requires
+  category: dependency
+  description: Mandatory prerequisite condition
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: precedes
+  category: dependency
+  description: Must occur before target in a sequence
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: true
+- id: conflicts_with
+  category: dependency
+  description: Mutually exclusive; cannot coexist
+  domain_hint: any
+  range_hint: any
+  symmetric: true
+  transitive: false
+- id: constrained_by
+  category: dependency
+  description: Behaviour constrained by a rule or policy
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: inherits_policy_from
+  category: dependency
+  description: Inherits configuration or policy from parent object
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: true
+- id: raises_alarm
+  category: operations
+  description: Condition that triggers an alarm
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: impacts
+  category: operations
+  description: Failure or change propagates impact to target
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: true
+- id: causes
+  category: operations
+  description: Root cause relationship
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: true
+- id: correlated_with
+  category: operations
+  description: Alarms or events that frequently co-occur
+  domain_hint: any
+  range_hint: any
+  symmetric: true
+  transitive: false
+- id: mitigated_by
+  category: operations
+  description: Fault or risk is reduced by a recovery action
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: monitored_by
+  category: operations
+  description: Object is observed by a management system
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: configured_by
+  category: operations
+  description: Object is configured by a tool, protocol, or person
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: supported_by
+  category: evidence
+  description: Claim is backed by an evidence source
+  domain_hint: Fact
+  range_hint: Evidence
+  symmetric: false
+  transitive: false
+- id: derived_from
+  category: evidence
+  description: Knowledge object extracted from a source segment
+  domain_hint: any
+  range_hint: KnowledgeSegment
+  symmetric: false
+  transitive: false
+- id: mentioned_in
+  category: evidence
+  description: Concept is mentioned in a document
+  domain_hint: any
+  range_hint: SourceDocument
+  symmetric: false
+  transitive: false
+- id: contradicted_by
+  category: evidence
+  description: Claim is contradicted by another source
+  domain_hint: Fact
+  range_hint: Fact
+  symmetric: false
+  transitive: false
+- id: participates_in
+  category: cross_layer
+  description: Concept participates in a mechanism
+  domain_hint: ConceptNode
+  range_hint: MechanismNode
+  symmetric: false
+  transitive: false
+- id: explains
+  category: cross_layer
+  description: Mechanism explains the behaviour of a concept
+  domain_hint: MechanismNode
+  range_hint: ConceptNode
+  symmetric: false
+  transitive: false
+- id: implemented_by
+  category: cross_layer
+  description: Mechanism is implemented by a method
+  domain_hint: MechanismNode
+  range_hint: MethodNode
+  symmetric: false
+  transitive: false
+- id: operates_on
+  category: cross_layer
+  description: Method operates on a concept object
+  domain_hint: MethodNode
+  range_hint: ConceptNode
+  symmetric: false
+  transitive: false
+- id: produces
+  category: cross_layer
+  description: Method produces a state or object
+  domain_hint: MethodNode
+  range_hint: ConceptNode
+  symmetric: false
+  transitive: false
+- id: governed_by
+  category: cross_layer
+  description: Method is governed by a condition rule
+  domain_hint: MethodNode
+  range_hint: ConditionRuleNode
+  symmetric: false
+  transitive: false
+- id: applies_to
+  category: cross_layer
+  description: Condition rule constrains a concept or method
+  domain_hint: ConditionRuleNode
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: contraindicates
+  category: cross_layer
+  description: Condition rule makes a method or scenario inadvisable
+  domain_hint: ConditionRuleNode
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: selects
+  category: cross_layer
+  description: Condition rule selects a method or scenario
+  domain_hint: ConditionRuleNode
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: preferred_under
+  category: cross_layer
+  description: Method or scenario is preferred under a condition
+  domain_hint: any
+  range_hint: ConditionRuleNode
+  symmetric: false
+  transitive: false
+- id: risky_under
+  category: cross_layer
+  description: Method or scenario carries risk under a condition
+  domain_hint: any
+  range_hint: ConditionRuleNode
+  symmetric: false
+  transitive: false
+- id: composed_of
+  category: cross_layer
+  description: Scenario is composed of concepts, mechanisms, and methods
+  domain_hint: ScenarioPatternNode
+  range_hint: any
+  symmetric: false
+  transitive: false
+- id: validated_by
+  category: cross_layer
+  description: Scenario or method is validated by a verification method
+  domain_hint: any
+  range_hint: MethodNode
+  symmetric: false
+  transitive: false
+- id: instantiated_as
+  category: cross_layer
+  description: Scenario pattern is instantiated as a concrete case
+  domain_hint: ScenarioPatternNode
+  range_hint: CaseNode
+  symmetric: false
+  transitive: false
+- id: applicable_when
+  category: cross_layer
+  description: Condition scopes where a scenario or method applies
+  domain_hint: any
+  range_hint: ConditionRuleNode
+  symmetric: false
+  transitive: false
+- id: risks
+  category: cross_layer
+  description: Condition layer identifies risks for a scenario
+  domain_hint: ConditionRuleNode
+  range_hint: ScenarioPatternNode
+  symmetric: false
+  transitive: false
+- id: replaces
+  category: evolved
+  description: 'Discovered relation: replaces'
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+  version_introduced: v0.1.5
