@@ -386,3 +386,11 @@ relations:
   symmetric: false
   transitive: false
   version_introduced: v0.1.5
+- id: distributes
+  category: evolved
+  description: 'Discovered relation: distributes'
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+  version_introduced: v0.1.13
