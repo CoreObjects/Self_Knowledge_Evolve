@@ -124,18 +124,34 @@ def list_review(
 
 @router.get("/review/{candidate_id}")
 def get_review(candidate_id: str, _app=Depends(get_app)):
-    """Get single candidate details + related segments via context_assemble."""
+    """Get single candidate details + related segments from recorded examples."""
     candidate = _review.get_candidate(candidate_id, store=_app.store)
     if candidate.get("error"):
         return candidate
 
-    # Use context_assemble to retrieve related segments and evidence
-    surface_forms = candidate.get("surface_forms") or []
-    normalized = candidate.get("normalized_form") or ""
-    keywords = [normalized] + [sf for sf in surface_forms if sf != normalized]
+    # Extract segment_ids from examples (recorded during Pipeline Stage 3/4)
+    import json
+    examples = candidate.get("examples") or []
+    if isinstance(examples, str):
+        try:
+            examples = json.loads(examples)
+        except Exception:
+            examples = []
 
-    context = _app.query("context_assemble", keywords=keywords[:5], max_segments=10).data
-    candidate["related_context"] = context
+    segment_ids = list({ex.get("segment_id") for ex in examples if ex.get("segment_id")})
+
+    # Retrieve full segment texts via filter operator
+    segments = []
+    if segment_ids:
+        for sid in segment_ids[:10]:  # limit to 10 segments
+            result = _app.query("filter", object_type="segment",
+                                filters={"segment_id": sid}, page_size=1).data
+            items = result.get("items") or []
+            if items:
+                segments.append(items[0])
+
+    candidate["related_segments"] = segments
+    candidate["segment_count"] = len(segment_ids)
     return candidate
 
 

@@ -119,7 +119,9 @@ class AlignStage(Stage):
                 "tagger":          "rule",
             })
 
-        candidate_terms = self._collect_candidates(raw_text, matched_nodes, segment["source_doc_id"])
+        candidate_terms = self._collect_candidates(
+            raw_text, matched_nodes, segment["source_doc_id"], str(segment["segment_id"]),
+        )
 
         seg_type = segment.get("segment_type", "unknown")
         if seg_type in _SEMANTIC_ROLE_TAGS:
@@ -171,12 +173,13 @@ class AlignStage(Stage):
         return found
 
     def _collect_candidates(
-        self, text: str, matched_nodes: dict, source_doc_id: str
+        self, text: str, matched_nodes: dict, source_doc_id: str, segment_id: str,
     ) -> int:
         """Rule A3: discover terms not in ontology → candidate pool.
 
         Priority: LLM extraction → regex fallback.
         Uses normalized_form as dedup key; accumulates source_count.
+        Records segment_id in examples for traceability.
         """
         from src.utils.normalize import normalize_term
         ontology = self._ontology
@@ -201,21 +204,26 @@ class AlignStage(Stage):
                 if not ontology.lookup_alias(c.lower())
             ]
 
-        self._upsert_candidates(unmatched_terms, source_doc_id)
+        self._upsert_candidates(unmatched_terms, source_doc_id, segment_id)
         return len(set(unmatched_terms))
 
-    def _upsert_candidates(self, terms: list[str], source_doc_id: str) -> None:
-        """Write candidate terms to governance.evolution_candidates."""
+    def _upsert_candidates(self, terms: list[str], source_doc_id: str, segment_id: str) -> None:
+        """Write candidate terms to governance.evolution_candidates.
+
+        Records segment_id + source_doc_id in examples JSONB for traceability.
+        """
+        import json
         from src.utils.normalize import normalize_term
         store = self._store
         for term in set(terms):
             normalized = normalize_term(term)
+            example = json.dumps([{"segment_id": segment_id, "source_doc_id": source_doc_id}])
             store.execute(
                 """
                 INSERT INTO governance.evolution_candidates
                     (surface_forms, normalized_form, source_count, last_seen_at,
-                     first_seen_at, seen_source_doc_ids, review_status)
-                VALUES (ARRAY[%s], %s, 1, NOW(), NOW(), ARRAY[%s::uuid], 'discovered')
+                     first_seen_at, seen_source_doc_ids, review_status, examples)
+                VALUES (ARRAY[%s], %s, 1, NOW(), NOW(), ARRAY[%s::uuid], 'discovered', %s::jsonb)
                 ON CONFLICT (normalized_form) DO UPDATE SET
                     source_count = governance.evolution_candidates.source_count + 1,
                     last_seen_at = NOW(),
@@ -228,9 +236,11 @@ class AlignStage(Stage):
                         WHEN NOT (%s::uuid = ANY(governance.evolution_candidates.seen_source_doc_ids))
                         THEN array_append(governance.evolution_candidates.seen_source_doc_ids, %s::uuid)
                         ELSE governance.evolution_candidates.seen_source_doc_ids
-                    END
+                    END,
+                    examples = governance.evolution_candidates.examples || %s::jsonb
                 """,
-                (term, normalized, source_doc_id, term, term, source_doc_id, source_doc_id),
+                (term, normalized, source_doc_id, example,
+                 term, term, source_doc_id, source_doc_id, example),
             )
 
     def _save_tags(self, segment_id: str, tags: list[dict]) -> int:

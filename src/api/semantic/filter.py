@@ -79,6 +79,12 @@ def _filter_segments(
     safe_sort = "confidence" if sort_by not in {"confidence", "created_at"} else sort_by
     safe_order = "DESC" if sort_order.lower() == "desc" else "ASC"
 
+    if filters.get("segment_id"):
+        where.append("s.segment_id::text = %s")
+        params.append(str(filters["segment_id"]))
+    if filters.get("source_doc_id"):
+        where.append("s.source_doc_id::text = %s")
+        params.append(str(filters["source_doc_id"]))
     if filters.get("min_confidence") is not None:
         where.append("s.confidence >= %s")
         params.append(filters["min_confidence"])
