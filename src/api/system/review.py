@@ -165,25 +165,39 @@ def _approve_concept(
     store: RelationalStore, graph: GraphStore, ontology,
 ) -> dict:
     """Write new concept to Neo4j + OntologyRegistry + lexicon_aliases."""
-    # Generate node_id following ontology naming convention:
-    # Concept layer: IP.UPPER_SNAKE (e.g. IP.SD_WAN)
-    # Use surface_form to derive a readable ID
+    # Generate node_id: IP.UPPER_SNAKE from the best surface form
     raw_name = surface_forms[0] if surface_forms else normalized
     node_id = "IP." + re.sub(r"[^A-Za-z0-9]+", "_", raw_name).upper().strip("_")
     display_name = raw_name
+
+    # Validate parent: must be a concept-layer node (IP.*), not mechanism/condition/etc
+    if parent_node_id and not parent_node_id.startswith("IP."):
+        log.warning("parent_node_id %s is not a concept node, clearing", parent_node_id)
+        parent_node_id = None
+
+    # Auto-generate description from related segments
+    description = _generate_description(candidate, surface_forms, store)
+
+    # Build complete alias list: surface_forms + common variants
+    all_aliases = list(set(aliases or surface_forms))
+    # Ensure both original case and lowercase are included
+    for sf in surface_forms:
+        if sf.lower() not in {a.lower() for a in all_aliases}:
+            all_aliases.append(sf)
 
     # Neo4j node
     graph.write(
         """
         MERGE (n:OntologyNode {node_id: $node_id})
         SET n.canonical_name = $name,
+            n.description = $description,
             n.lifecycle_state = 'active',
             n.maturity_level = 'evolved',
             n.approved = true,
             n.source_count = $source_count,
             n.composite_score = $composite_score
         """,
-        node_id=node_id, name=display_name,
+        node_id=node_id, name=display_name, description=description,
         source_count=int(candidate.get("source_count") or 0),
         composite_score=float(candidate.get("composite_score") or 0),
     )
@@ -200,7 +214,7 @@ def _approve_concept(
         )
 
     # Aliases → Neo4j + PG
-    for alias in aliases:
+    for alias in all_aliases:
         alias_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{node_id}:{alias}"))
         graph.write(
             """
@@ -221,16 +235,16 @@ def _approve_concept(
 
     # Update in-memory OntologyRegistry
     if hasattr(ontology, "alias_map"):
-        for alias in aliases:
+        for alias in all_aliases:
             ontology.alias_map[alias.lower()] = node_id
 
-    log.info("Concept approved: %s (node_id=%s, parent=%s, aliases=%d)",
-             normalized, node_id, parent_node_id, len(aliases))
+    log.info("Concept approved: %s (node_id=%s, parent=%s, aliases=%d, desc=%d chars)",
+             normalized, node_id, parent_node_id, len(all_aliases), len(description))
 
-    # Persist to YAML (source of truth) — will be picked up on next restart
+    # Persist to YAML (source of truth)
     version = _get_latest_version(store)
-    _write_concept_yaml(node_id, display_name, parent_node_id, aliases, version)
-    _write_aliases_yaml(node_id, aliases, version)
+    _write_concept_yaml(node_id, display_name, parent_node_id, all_aliases, version, description)
+    _write_aliases_yaml(node_id, all_aliases, version)
     _git_commit_ontology(version, f"Approved concept: {display_name}")
 
     return {
@@ -238,9 +252,10 @@ def _approve_concept(
         "candidate_type": "concept",
         "node_id": node_id,
         "parent_node_id": parent_node_id,
-        "aliases": aliases,
+        "aliases": all_aliases,
+        "description": description,
         "needs_backfill": True,
-        "backfill_terms": [a.lower() for a in aliases],
+        "backfill_terms": [a.lower() for a in all_aliases],
     }
 
 
@@ -323,6 +338,53 @@ def _approve_relation(
         "facts_created": facts_created,
         "needs_backfill": False,
     }
+
+
+def _generate_description(candidate: dict, surface_forms: list[str], store: RelationalStore) -> str:
+    """Auto-generate a description from related segments via LLM."""
+    examples = candidate.get("examples") or []
+    if isinstance(examples, str):
+        try:
+            examples = json.loads(examples)
+        except Exception:
+            examples = []
+
+    # Collect segment texts from examples
+    texts = []
+    for ex in examples[:5]:
+        seg_id = ex.get("segment_id")
+        if seg_id:
+            row = store.fetchone(
+                "SELECT raw_text FROM segments WHERE segment_id::text = %s", (str(seg_id),),
+            )
+            if row and row.get("raw_text"):
+                texts.append(row["raw_text"][:500])
+
+    if not texts:
+        return ""
+
+    # Use LLM to generate concise description
+    try:
+        from src.utils.llm_extract import LLMExtractor
+        llm = LLMExtractor()
+        if not llm.is_enabled():
+            return ""
+
+        term = surface_forms[0] if surface_forms else candidate.get("normalized_form", "")
+        context = "\n---\n".join(texts[:3])
+        system = (
+            "Generate a concise technical description (1-2 sentences, max 200 chars) "
+            "for a networking/telecom concept based on the context provided. "
+            "Return ONLY the description text, nothing else."
+        )
+        prompt = f"Concept: {term}\n\nContext from documents:\n{context}\n\nDescription:"
+        desc = llm._call_llm(system, prompt, 128)
+        if desc:
+            return desc.strip()[:300]
+    except Exception as exc:
+        log.warning("Failed to generate description: %s", exc)
+
+    return ""
 
 
 def _get_latest_version(store: RelationalStore) -> str:
