@@ -396,3 +396,25 @@ def ontology_quality(_app = Depends(get_app)):
         return _wrap(_app.query("ontology_quality"))
     except Exception as exc:
         return _err(str(exc))
+
+
+class ContextAssembleRequest(BaseModel):
+    node_ids:     list[str] | None = None
+    keywords:     list[str] | None = None
+    max_segments: int = 50
+    max_hops:     int = 2
+
+
+@router.post("/context_assemble")
+def context_assemble(body: ContextAssembleRequest, _app = Depends(get_app)):
+    """Assemble full agent context package: reasoning chain + segments + evidence."""
+    try:
+        return _wrap(_app.query(
+            "context_assemble",
+            node_ids=body.node_ids,
+            keywords=body.keywords,
+            max_segments=body.max_segments,
+            max_hops=body.max_hops,
+        ))
+    except Exception as exc:
+        return _err(str(exc))

@@ -15,6 +15,7 @@ from src.operators.cross_layer_check_op   import CrossLayerCheckOperator
 from src.operators.ontology_inspect_op    import OntologyInspectOperator
 from src.operators.stale_knowledge_op     import StaleKnowledgeOperator
 from src.operators.ontology_quality_op    import OntologyQualityOperator
+from src.operators.context_assemble_op   import ContextAssembleOperator
 
 ALL_OPERATORS = [
     LookupOperator(),
@@ -37,4 +38,5 @@ ALL_OPERATORS = [
     OntologyInspectOperator(),
     StaleKnowledgeOperator(),
     OntologyQualityOperator(),
+    ContextAssembleOperator(),
 ]
