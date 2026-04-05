@@ -402,3 +402,11 @@ relations:
   symmetric: false
   transitive: false
   version_introduced: v0.1.14
+- id: associated_with
+  category: evolved
+  description: 'Discovered relation: associated_with'
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+  version_introduced: v0.1.15
