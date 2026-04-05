@@ -937,3 +937,15 @@ aliases:
   language: en
   confidence: 0.9
   version_introduced: v0.1.41
+- surface_form: router-lsas
+  canonical_node_id: IP.ROUTER_LSAS
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.42
+- surface_form: router-LSAs
+  canonical_node_id: IP.ROUTER_LSAS
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.42

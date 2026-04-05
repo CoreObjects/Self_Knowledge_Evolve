@@ -316,3 +316,17 @@ nodes:
   - MOSPF
   - mospf
   allowed_relations: []
+- id: IP.ROUTER_LSAS
+  canonical_name: router-lsas
+  display_name_zh: ''
+  parent_id: IP.L3_ROUTING
+  knowledge_layer: concept
+  maturity_level: evolved
+  lifecycle_state: active
+  version_introduced: v0.1.42
+  description: Router-LSAs are OSPF link state advertisements that describe the state
+    and cost of a router's interfaces to an area.
+  aliases:
+  - router-lsas
+  - router-LSAs
+  allowed_relations: []
