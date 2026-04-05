@@ -426,3 +426,11 @@ relations:
   symmetric: false
   transitive: false
   version_introduced: v0.1.17
+- id: modifies
+  category: evolved
+  description: 'Discovered relation: modifies'
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+  version_introduced: v0.1.18
