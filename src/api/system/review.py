@@ -227,6 +227,12 @@ def _approve_concept(
     log.info("Concept approved: %s (node_id=%s, parent=%s, aliases=%d)",
              normalized, node_id, parent_node_id, len(aliases))
 
+    # Persist to YAML (source of truth) — will be picked up on next restart
+    version = _get_latest_version(store)
+    _write_concept_yaml(node_id, display_name, parent_node_id, aliases, version)
+    _write_aliases_yaml(node_id, aliases, version)
+    _git_commit_ontology(version, f"Approved concept: {display_name}")
+
     return {
         "status": "approved",
         "candidate_type": "concept",
@@ -304,6 +310,12 @@ def _approve_relation(
             log.warning("Failed to create fact from example: %s", exc)
 
     log.info("Relation approved: %s → %d facts retroactively created", predicate, facts_created)
+
+    # Persist to YAML
+    version = _get_latest_version(store)
+    _write_relation_yaml(predicate, version)
+    _git_commit_ontology(version, f"Approved relation: {predicate}")
+
     return {
         "status": "approved",
         "candidate_type": "relation",
@@ -311,6 +323,14 @@ def _approve_relation(
         "facts_created": facts_created,
         "needs_backfill": False,
     }
+
+
+def _get_latest_version(store: RelationalStore) -> str:
+    """Get the latest ontology version tag."""
+    row = store.fetchone(
+        "SELECT version_tag FROM governance.ontology_versions ORDER BY created_at DESC LIMIT 1"
+    )
+    return row["version_tag"] if row else "v0.2.0"
 
 
 def _write_review_record(
@@ -347,3 +367,131 @@ def _bump_version(store: RelationalStore, candidate_type: str, name: str) -> str
     )
 
     return new_version
+
+
+# ── YAML persistence + Git commit ────────────────────────────────────────────
+
+from pathlib import Path
+import yaml
+import subprocess
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+_ONTOLOGY_ROOT = _PROJECT_ROOT / "ontology"
+
+
+def _write_concept_yaml(
+    node_id: str, display_name: str, parent_node_id: str | None,
+    aliases: list[str], version: str, description: str = "",
+) -> None:
+    """Append approved concept to ontology/domains/ip_network_evolved.yaml."""
+    evolved_file = _ONTOLOGY_ROOT / "domains" / "ip_network_evolved.yaml"
+
+    if evolved_file.exists():
+        data = yaml.safe_load(evolved_file.read_text(encoding="utf-8")) or {}
+    else:
+        data = {
+            "version": version,
+            "domain": "IP / Data Communication Network (Evolved)",
+            "domain_id": "IP",
+            "nodes": [],
+        }
+
+    # Check if node already exists
+    existing_ids = {n["id"] for n in data.get("nodes", [])}
+    if node_id in existing_ids:
+        log.info("Concept %s already in evolved YAML, skipping", node_id)
+        return
+
+    node_entry = {
+        "id": node_id,
+        "canonical_name": display_name,
+        "display_name_zh": "",
+        "parent_id": parent_node_id,
+        "knowledge_layer": "concept",
+        "maturity_level": "evolved",
+        "lifecycle_state": "active",
+        "version_introduced": version,
+        "description": description,
+        "aliases": aliases,
+        "allowed_relations": [],
+    }
+    data.setdefault("nodes", []).append(node_entry)
+
+    evolved_file.write_text(
+        yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False),
+        encoding="utf-8",
+    )
+    log.info("Wrote concept %s to %s", node_id, evolved_file.name)
+
+
+def _write_relation_yaml(predicate: str, version: str, description: str = "") -> None:
+    """Append approved relation to ontology/top/relations.yaml."""
+    relations_file = _ONTOLOGY_ROOT / "top" / "relations.yaml"
+    data = yaml.safe_load(relations_file.read_text(encoding="utf-8")) or {}
+
+    existing_ids = {r["id"] for r in data.get("relations", [])}
+    if predicate in existing_ids:
+        log.info("Relation %s already in relations.yaml, skipping", predicate)
+        return
+
+    data.setdefault("relations", []).append({
+        "id": predicate,
+        "category": "evolved",
+        "description": description or f"Discovered relation: {predicate}",
+        "domain_hint": "any",
+        "range_hint": "any",
+        "symmetric": False,
+        "transitive": False,
+        "version_introduced": version,
+    })
+
+    relations_file.write_text(
+        yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False),
+        encoding="utf-8",
+    )
+    log.info("Wrote relation %s to %s", predicate, relations_file.name)
+
+
+def _write_aliases_yaml(node_id: str, aliases: list[str], version: str) -> None:
+    """Append approved aliases to ontology/lexicon/aliases.yaml."""
+    alias_file = _ONTOLOGY_ROOT / "lexicon" / "aliases.yaml"
+    data = yaml.safe_load(alias_file.read_text(encoding="utf-8")) or {}
+
+    existing = {(a["surface_form"].lower(), a["canonical_node_id"])
+                for a in data.get("aliases", [])}
+
+    added = 0
+    for alias in aliases:
+        if (alias.lower(), node_id) not in existing:
+            data.setdefault("aliases", []).append({
+                "surface_form": alias,
+                "canonical_node_id": node_id,
+                "alias_type": "evolved",
+                "language": "en",
+                "confidence": 0.9,
+                "version_introduced": version,
+            })
+            added += 1
+
+    if added:
+        alias_file.write_text(
+            yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False),
+            encoding="utf-8",
+        )
+        log.info("Wrote %d aliases for %s to %s", added, node_id, alias_file.name)
+
+
+def _git_commit_ontology(version: str, description: str) -> None:
+    """Stage ontology changes and commit with version tag."""
+    try:
+        subprocess.run(
+            ["git", "add", "ontology/"],
+            cwd=str(_PROJECT_ROOT), capture_output=True, timeout=10,
+        )
+        subprocess.run(
+            ["git", "commit", "-m", f"Ontology {version}: {description}"],
+            cwd=str(_PROJECT_ROOT), capture_output=True, timeout=10,
+        )
+        log.info("Git committed: Ontology %s: %s", version, description)
+    except Exception as exc:
+        log.warning("Git commit failed (non-fatal): %s", exc)
