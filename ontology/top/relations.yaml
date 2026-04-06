@@ -490,3 +490,11 @@ relations:
   symmetric: false
   transitive: false
   version_introduced: v0.1.44
+- id: provides
+  category: evolved
+  description: 'Discovered relation: provides'
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+  version_introduced: v0.1.45
