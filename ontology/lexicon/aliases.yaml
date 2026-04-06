@@ -991,3 +991,27 @@ aliases:
   language: en
   confidence: 0.9
   version_introduced: v0.1.49
+- surface_form: restconf
+  canonical_node_id: IP.RESTCONF
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.50
+- surface_form: restconf server
+  canonical_node_id: IP.RESTCONF
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.50
+- surface_form: RESTCONF
+  canonical_node_id: IP.RESTCONF
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.50
+- surface_form: restconf client
+  canonical_node_id: IP.RESTCONF
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.50

@@ -371,3 +371,20 @@ nodes:
   - IGMP protocol
   - IGMP
   allowed_relations: []
+- id: IP.RESTCONF
+  canonical_name: RESTCONF
+  display_name_zh: ''
+  parent_id: IP.L3_ROUTING
+  knowledge_layer: concept
+  maturity_level: evolved
+  lifecycle_state: active
+  version_introduced: v0.1.50
+  description: RESTCONF is a protocol that uses HTTP methods to provide a programmatic
+    interface for accessing data defined in YANG models, supporting both XML and JSON
+    encodings.
+  aliases:
+  - restconf
+  - restconf server
+  - RESTCONF
+  - restconf client
+  allowed_relations: []
