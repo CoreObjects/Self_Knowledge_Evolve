@@ -622,3 +622,28 @@ nodes:
   - inter-area multicast forwarder
   - inter-area multicast forwarders
   allowed_relations: []
+- id: IP.CONTROL_PLANE
+  canonical_name: control plane
+  display_name_zh: ''
+  parent_id: IP.EVPN_VXLAN
+  knowledge_layer: concept
+  maturity_level: evolved
+  lifecycle_state: active
+  version_introduced: v0.1.63
+  description: The control plane manages network routing and signaling, determining
+    optimal paths for data transmission.
+  aliases:
+  - control plane
+  - control planes
+  - control-plane state
+  - control-plane module
+  - Control plane DOS attacks
+  - control plane behavior
+  - control plane state
+  - control-plane
+  - control-plane information
+  - control plane driven
+  - management plane driven
+  - control plane functions
+  - control plane attacks
+  allowed_relations: []

@@ -1537,3 +1537,81 @@ aliases:
   language: en
   confidence: 0.9
   version_introduced: v0.1.62
+- surface_form: control plane
+  canonical_node_id: IP.CONTROL_PLANE
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.63
+- surface_form: control planes
+  canonical_node_id: IP.CONTROL_PLANE
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.63
+- surface_form: control-plane state
+  canonical_node_id: IP.CONTROL_PLANE
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.63
+- surface_form: control-plane module
+  canonical_node_id: IP.CONTROL_PLANE
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.63
+- surface_form: Control plane DOS attacks
+  canonical_node_id: IP.CONTROL_PLANE
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.63
+- surface_form: control plane behavior
+  canonical_node_id: IP.CONTROL_PLANE
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.63
+- surface_form: control plane state
+  canonical_node_id: IP.CONTROL_PLANE
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.63
+- surface_form: control-plane
+  canonical_node_id: IP.CONTROL_PLANE
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.63
+- surface_form: control-plane information
+  canonical_node_id: IP.CONTROL_PLANE
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.63
+- surface_form: control plane driven
+  canonical_node_id: IP.CONTROL_PLANE
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.63
+- surface_form: management plane driven
+  canonical_node_id: IP.CONTROL_PLANE
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.63
+- surface_form: control plane functions
+  canonical_node_id: IP.CONTROL_PLANE
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.63
+- surface_form: control plane attacks
+  canonical_node_id: IP.CONTROL_PLANE
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.63
