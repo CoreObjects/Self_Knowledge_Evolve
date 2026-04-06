@@ -415,3 +415,17 @@ nodes:
   - Export targets
   - route target community
   allowed_relations: []
+- id: IP.ALL_ACTIVE_REDUNDANCY_MODE
+  canonical_name: all-active redundancy mode
+  display_name_zh: ''
+  parent_id: IP.VRRP
+  knowledge_layer: concept
+  maturity_level: evolved
+  lifecycle_state: active
+  version_introduced: v0.1.52
+  description: A redundancy mode where all links in an Ethernet segment are active
+    and forwarding traffic simultaneously, enabling load balancing.
+  aliases:
+  - all-active redundancy
+  - all-active redundancy mode
+  allowed_relations: []

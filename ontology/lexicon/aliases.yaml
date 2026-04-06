@@ -1105,3 +1105,15 @@ aliases:
   language: en
   confidence: 0.9
   version_introduced: v0.1.51
+- surface_form: all-active redundancy
+  canonical_node_id: IP.ALL_ACTIVE_REDUNDANCY_MODE
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.52
+- surface_form: all-active redundancy mode
+  canonical_node_id: IP.ALL_ACTIVE_REDUNDANCY_MODE
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.52
