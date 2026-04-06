@@ -388,3 +388,30 @@ nodes:
   - RESTCONF
   - restconf client
   allowed_relations: []
+- id: IP.ROUTE_TARGET
+  canonical_name: route target
+  display_name_zh: ''
+  parent_id: IP.ROUTE_POLICY
+  knowledge_layer: concept
+  maturity_level: evolved
+  lifecycle_state: active
+  version_introduced: v0.1.51
+  description: A BGP extended community attribute used in MPLS VPNs to control the
+    import and export of VPN routes between provider edge (PE) routers.
+  aliases:
+  - route target extended community
+  - export target
+  - route-target
+  - route target
+  - route target (rt)
+  - export targets
+  - export route target
+  - route targets
+  - import target
+  - es-import route target
+  - Import targets
+  - route-targets
+  - import route target
+  - Export targets
+  - route target community
+  allowed_relations: []

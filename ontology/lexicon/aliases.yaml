@@ -1015,3 +1015,93 @@ aliases:
   language: en
   confidence: 0.9
   version_introduced: v0.1.50
+- surface_form: route target extended community
+  canonical_node_id: IP.ROUTE_TARGET
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.51
+- surface_form: export target
+  canonical_node_id: IP.ROUTE_TARGET
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.51
+- surface_form: route-target
+  canonical_node_id: IP.ROUTE_TARGET
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.51
+- surface_form: route target
+  canonical_node_id: IP.ROUTE_TARGET
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.51
+- surface_form: route target (rt)
+  canonical_node_id: IP.ROUTE_TARGET
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.51
+- surface_form: export targets
+  canonical_node_id: IP.ROUTE_TARGET
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.51
+- surface_form: export route target
+  canonical_node_id: IP.ROUTE_TARGET
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.51
+- surface_form: route targets
+  canonical_node_id: IP.ROUTE_TARGET
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.51
+- surface_form: import target
+  canonical_node_id: IP.ROUTE_TARGET
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.51
+- surface_form: es-import route target
+  canonical_node_id: IP.ROUTE_TARGET
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.51
+- surface_form: Import targets
+  canonical_node_id: IP.ROUTE_TARGET
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.51
+- surface_form: route-targets
+  canonical_node_id: IP.ROUTE_TARGET
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.51
+- surface_form: import route target
+  canonical_node_id: IP.ROUTE_TARGET
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.51
+- surface_form: Export targets
+  canonical_node_id: IP.ROUTE_TARGET
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.51
+- surface_form: route target community
+  canonical_node_id: IP.ROUTE_TARGET
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.51
