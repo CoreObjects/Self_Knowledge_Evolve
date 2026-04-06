@@ -531,3 +531,26 @@ nodes:
   - path-mtu-discovery
   - path MTU discovery
   allowed_relations: []
+- id: IP.ROUTE_DISTINGUISHER
+  canonical_name: Route Distinguisher
+  display_name_zh: ''
+  parent_id: IP.ROUTE_POLICY
+  knowledge_layer: concept
+  maturity_level: evolved
+  lifecycle_state: active
+  version_introduced: v0.1.58
+  description: A Route Distinguisher (RD) is a unique identifier prepended to an IP
+    address within a VPN to create distinct routing tables for overlapping addresses
+    across different customers.
+  aliases:
+  - Route Distinguisher (RD)
+  - route distinguisher type field
+  - route-distinguisher (rd)
+  - Route Distinguisher
+  - route-distinguisher
+  - route distinguisher
+  - automatic route distinguisher
+  - route distinguisher (rd)
+  - route-distinguisher (RD)
+  - route distinguishers
+  allowed_relations: []

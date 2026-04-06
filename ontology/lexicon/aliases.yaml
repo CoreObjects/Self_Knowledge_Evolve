@@ -1357,3 +1357,63 @@ aliases:
   language: en
   confidence: 0.9
   version_introduced: v0.1.57
+- surface_form: Route Distinguisher (RD)
+  canonical_node_id: IP.ROUTE_DISTINGUISHER
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.58
+- surface_form: route distinguisher type field
+  canonical_node_id: IP.ROUTE_DISTINGUISHER
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.58
+- surface_form: route-distinguisher (rd)
+  canonical_node_id: IP.ROUTE_DISTINGUISHER
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.58
+- surface_form: Route Distinguisher
+  canonical_node_id: IP.ROUTE_DISTINGUISHER
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.58
+- surface_form: route-distinguisher
+  canonical_node_id: IP.ROUTE_DISTINGUISHER
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.58
+- surface_form: route distinguisher
+  canonical_node_id: IP.ROUTE_DISTINGUISHER
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.58
+- surface_form: automatic route distinguisher
+  canonical_node_id: IP.ROUTE_DISTINGUISHER
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.58
+- surface_form: route distinguisher (rd)
+  canonical_node_id: IP.ROUTE_DISTINGUISHER
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.58
+- surface_form: route-distinguisher (RD)
+  canonical_node_id: IP.ROUTE_DISTINGUISHER
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.58
+- surface_form: route distinguishers
+  canonical_node_id: IP.ROUTE_DISTINGUISHER
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.58
