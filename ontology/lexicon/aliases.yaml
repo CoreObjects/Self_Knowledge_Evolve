@@ -961,3 +961,21 @@ aliases:
   language: en
   confidence: 0.9
   version_introduced: v0.1.43
+- surface_form: segment-routing
+  canonical_node_id: IP.SEGMENT_ROUTING
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.48
+- surface_form: segment routing
+  canonical_node_id: IP.SEGMENT_ROUTING
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.48
+- surface_form: Segment Routing
+  canonical_node_id: IP.SEGMENT_ROUTING
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.48

@@ -343,3 +343,17 @@ nodes:
   - srh
   - SRH
   allowed_relations: []
+- id: IP.SEGMENT_ROUTING
+  canonical_name: segment routing
+  display_name_zh: ''
+  parent_id: IP.SR_MPLS
+  knowledge_layer: concept
+  maturity_level: evolved
+  lifecycle_state: active
+  version_introduced: v0.1.48
+  description: ''
+  aliases:
+  - segment-routing
+  - segment routing
+  - Segment Routing
+  allowed_relations: []
