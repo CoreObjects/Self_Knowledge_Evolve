@@ -482,3 +482,11 @@ relations:
   symmetric: false
   transitive: false
   version_introduced: v0.1.30
+- id: used_for
+  category: evolved
+  description: 'Discovered relation: used_for'
+  domain_hint: any
+  range_hint: any
+  symmetric: false
+  transitive: false
+  version_introduced: v0.1.44
