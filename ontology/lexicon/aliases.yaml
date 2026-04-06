@@ -1255,3 +1255,45 @@ aliases:
   language: en
   confidence: 0.9
   version_introduced: v0.1.54
+- surface_form: MAC mobility event
+  canonical_node_id: IP.MAC_MOBILITY
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.55
+- surface_form: mac address mobility
+  canonical_node_id: IP.MAC_MOBILITY
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.55
+- surface_form: mac mobility attribute
+  canonical_node_id: IP.MAC_MOBILITY
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.55
+- surface_form: MAC mobility attribute
+  canonical_node_id: IP.MAC_MOBILITY
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.55
+- surface_form: mobility event
+  canonical_node_id: IP.MAC_MOBILITY
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.55
+- surface_form: mac mobility
+  canonical_node_id: IP.MAC_MOBILITY
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.55
+- surface_form: mac mobility event
+  canonical_node_id: IP.MAC_MOBILITY
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.55

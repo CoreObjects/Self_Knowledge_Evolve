@@ -477,3 +477,22 @@ nodes:
   - nves
   - nve
   allowed_relations: []
+- id: IP.MAC_MOBILITY
+  canonical_name: mac mobility
+  display_name_zh: ''
+  parent_id: IP.L2_SWITCHING
+  knowledge_layer: concept
+  maturity_level: evolved
+  lifecycle_state: active
+  version_introduced: v0.1.55
+  description: MAC mobility is an EVPN feature that handles the movement of a MAC
+    address from one Ethernet segment to another, updating forwarding paths accordingly.
+  aliases:
+  - MAC mobility event
+  - mac address mobility
+  - mac mobility attribute
+  - MAC mobility attribute
+  - mobility event
+  - mac mobility
+  - mac mobility event
+  allowed_relations: []
