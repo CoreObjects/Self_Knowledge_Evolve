@@ -1297,3 +1297,15 @@ aliases:
   language: en
   confidence: 0.9
   version_introduced: v0.1.55
+- surface_form: ingress-replicated
+  canonical_node_id: IP.INGRESS_REPLICATION
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.56
+- surface_form: ingress replication
+  canonical_node_id: IP.INGRESS_REPLICATION
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.56

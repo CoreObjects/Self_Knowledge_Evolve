@@ -496,3 +496,17 @@ nodes:
   - mac mobility
   - mac mobility event
   allowed_relations: []
+- id: IP.INGRESS_REPLICATION
+  canonical_name: ingress replication
+  display_name_zh: ''
+  parent_id: IP.L3_ROUTING
+  knowledge_layer: concept
+  maturity_level: evolved
+  lifecycle_state: active
+  version_introduced: v0.1.56
+  description: Ingress replication is a method where a PE router replicates ingress
+    BUM traffic and sends a unicast copy to each remote PE in the EVPN instance.
+  aliases:
+  - ingress-replicated
+  - ingress replication
+  allowed_relations: []
