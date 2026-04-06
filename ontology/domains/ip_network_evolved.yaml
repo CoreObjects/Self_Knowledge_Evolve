@@ -429,3 +429,34 @@ nodes:
   - all-active redundancy
   - all-active redundancy mode
   allowed_relations: []
+- id: IP.MULTI_HOMED
+  canonical_name: multi-homed
+  display_name_zh: ''
+  parent_id: IP.L3_ROUTING
+  knowledge_layer: concept
+  maturity_level: evolved
+  lifecycle_state: active
+  version_introduced: v0.1.53
+  description: A network configuration where a system or site is connected to multiple
+    upstream providers or links for redundancy and load balancing.
+  aliases:
+  - multi-homed site
+  - multi-homed servers
+  - multi-homed
+  - multi-homed network (MHN)
+  - multi-homed hosts
+  - multi-homed ce
+  - multihomed
+  - multi-homed network
+  - multi-homed subnets
+  - multi-homed sites
+  - multihomed host
+  - multihomed networks
+  - multi-homed device
+  - multiply homed host
+  - multi-homed device (MHD)
+  - multihomed hosts
+  - remote multi-homed hosts
+  - multi-homed host
+  - multihomed sites
+  allowed_relations: []

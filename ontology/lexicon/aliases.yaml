@@ -1117,3 +1117,117 @@ aliases:
   language: en
   confidence: 0.9
   version_introduced: v0.1.52
+- surface_form: multi-homed site
+  canonical_node_id: IP.MULTI_HOMED
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.53
+- surface_form: multi-homed servers
+  canonical_node_id: IP.MULTI_HOMED
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.53
+- surface_form: multi-homed
+  canonical_node_id: IP.MULTI_HOMED
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.53
+- surface_form: multi-homed network (MHN)
+  canonical_node_id: IP.MULTI_HOMED
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.53
+- surface_form: multi-homed hosts
+  canonical_node_id: IP.MULTI_HOMED
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.53
+- surface_form: multi-homed ce
+  canonical_node_id: IP.MULTI_HOMED
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.53
+- surface_form: multihomed
+  canonical_node_id: IP.MULTI_HOMED
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.53
+- surface_form: multi-homed network
+  canonical_node_id: IP.MULTI_HOMED
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.53
+- surface_form: multi-homed subnets
+  canonical_node_id: IP.MULTI_HOMED
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.53
+- surface_form: multi-homed sites
+  canonical_node_id: IP.MULTI_HOMED
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.53
+- surface_form: multihomed host
+  canonical_node_id: IP.MULTI_HOMED
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.53
+- surface_form: multihomed networks
+  canonical_node_id: IP.MULTI_HOMED
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.53
+- surface_form: multi-homed device
+  canonical_node_id: IP.MULTI_HOMED
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.53
+- surface_form: multiply homed host
+  canonical_node_id: IP.MULTI_HOMED
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.53
+- surface_form: multi-homed device (MHD)
+  canonical_node_id: IP.MULTI_HOMED
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.53
+- surface_form: multihomed hosts
+  canonical_node_id: IP.MULTI_HOMED
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.53
+- surface_form: remote multi-homed hosts
+  canonical_node_id: IP.MULTI_HOMED
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.53
+- surface_form: multi-homed host
+  canonical_node_id: IP.MULTI_HOMED
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.53
+- surface_form: multihomed sites
+  canonical_node_id: IP.MULTI_HOMED
+  alias_type: evolved
+  language: en
+  confidence: 0.9
+  version_introduced: v0.1.53
