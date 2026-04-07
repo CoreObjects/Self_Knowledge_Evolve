@@ -2,12 +2,32 @@
 
 from __future__ import annotations
 
+import os
 import logging
 
 from semcore.app import AppConfig, SemanticApp
 from semcore.operators.base import LoggingMiddleware, TimingMiddleware
 
 log = logging.getLogger(__name__)
+
+
+def _build_object_store(settings: object):
+    """
+    Build object store provider.
+
+    In local dev (`DEV_FAKE_OBJECTS=1/true`) we intentionally bypass MinIO and
+    use an in-memory object store so run_dev.py has zero external dependencies.
+    """
+    use_fake = str(os.getenv("DEV_FAKE_OBJECTS", "")).strip().lower() in {"1", "true", "yes", "on"}
+    if use_fake:
+        from src.dev.fake_object_store import InMemoryObjectStore
+
+        log.info("  ObjectStore: InMemoryObjectStore (DEV_FAKE_OBJECTS enabled)")
+        return InMemoryObjectStore()
+
+    from src.providers.minio_store import MinioObjectStore
+
+    return MinioObjectStore(settings)
 
 
 def build_app() -> SemanticApp:
@@ -25,7 +45,6 @@ def build_app() -> SemanticApp:
     from src.providers.neo4j_store             import Neo4jGraphStore
     from src.providers.anthropic_llm           import ClaudeLLMProvider
     from src.providers.bge_m3_embedding        import BGEM3EmbeddingProvider
-    from src.providers.minio_store             import MinioObjectStore
     from src.providers.crawler_postgres_store  import CrawlerPostgresRelationalStore
 
     # ── Ontology ──────────────────────────────────────────────────────────────
@@ -55,7 +74,7 @@ def build_app() -> SemanticApp:
         graph     = Neo4jGraphStore(),
         store         = PostgresRelationalStore(),
         crawler_store = CrawlerPostgresRelationalStore(),
-        objects       = MinioObjectStore(settings),
+        objects       = _build_object_store(settings),
         ontology  = YAMLOntologyProvider(registry),
         confidence_scorer = TelecomConfidenceScorer(),
         conflict_detector = TelecomConflictDetector(),
