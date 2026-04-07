@@ -15,10 +15,21 @@ Endpoints to smoke-test:
 from __future__ import annotations
 
 import sys
+import os
 import logging
 from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s  %(message)s")
+
+# ── Step 0: set safe defaults for local dev before settings import ────────────
+os.environ.setdefault("DEV_FAKE_OBJECTS", "1")
+os.environ.setdefault("POSTGRES_HOST", "127.0.0.1")
+os.environ.setdefault("POSTGRES_PORT", "5432")
+os.environ.setdefault("POSTGRES_DB", "telecom_kb")
+os.environ.setdefault("POSTGRES_USER", "postgres")
+os.environ.setdefault("POSTGRES_PASSWORD", "postgres")
+os.environ.setdefault("POSTGRES_POOL_MIN", "1")
+os.environ.setdefault("POSTGRES_POOL_MAX", "5")
 
 # Make the semcore package importable without installing it
 _semcore_path = str(Path(__file__).parent / "semcore")
