@@ -1,0 +1,53 @@
+{
+  "project_id": "",
+  "exported_at": "2026-04-06T20:31:31.558333",
+  "learned_items": [
+    {
+      "text": "Selected OSPF multi-area for backbone due to 500+ devices",
+      "concepts": [
+        "IP.OSPF"
+      ],
+      "item_type": "decision",
+      "metadata": {},
+      "timestamp": "2026-04-06T20:31:31.558176"
+    },
+    {
+      "text": "BFD timer set to 100ms for fast failover",
+      "concepts": [
+        "IP.BFD"
+      ],
+      "item_type": "decision",
+      "metadata": {},
+      "timestamp": "2026-04-06T20:31:31.558238"
+    },
+    {
+      "text": "Asymmetric routing occurred when BGP MED was not configured",
+      "concepts": [
+        "IP.BGP"
+      ],
+      "item_type": "lesson",
+      "metadata": {},
+      "timestamp": "2026-04-06T20:31:31.558259"
+    },
+    {
+      "text": "New term: Super Spine",
+      "concepts": [
+        "IP.SPINE_LEAF"
+      ],
+      "item_type": "term",
+      "metadata": {
+        "term": "Super Spine",
+        "parent_concept": "IP.SPINE_LEAF",
+        "description": "Top-tier switch in 3-tier Spine-Leaf fabric"
+      },
+      "timestamp": "2026-04-06T20:31:31.558266"
+    }
+  ],
+  "stats": {
+    "total_items": 4,
+    "decisions": 2,
+    "terms": 1,
+    "observations": 0,
+    "lessons": 1
+  }
+}
