@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "semantic-context-kit"
+version = "0.1.0"
+description = "Lightweight domain knowledge organizer for Agent integration"
+requires-python = ">=3.11"
+dependencies = []  # zero deps for core
+
+[project.optional-dependencies]
+platform = ["requests"]
+yaml = ["pyyaml"]
+dev = ["pytest"]
